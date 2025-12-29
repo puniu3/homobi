@@ -89,6 +89,23 @@
             text-transform: uppercase;
             letter-spacing: 1px;
         }
+        .highscore-text {
+            margin-top: 12px;
+            font-size: 1.1rem;
+            color: #ffcc00;
+            font-weight: 600;
+        }
+        .new-highscore {
+            margin-top: 16px;
+            font-size: 1rem;
+            color: #00ffcc;
+            font-weight: 700;
+            animation: pulse-glow 1s ease-in-out infinite;
+        }
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.05); }
+        }
         #audio-hint {
             position: fixed;
             bottom: 40px;
@@ -181,6 +198,8 @@
             <h1 class="text-4xl font-black mb-4 text-red-500 tracking-tighter">CITY FALLEN</h1>
             <p class="text-lg mb-2 text-gray-400">The night sky has gone dark.</p>
             <p class="text-3xl font-bold mt-4">Score: <span id="final-score">0</span></p>
+            <p id="new-highscore" class="new-highscore" style="display: none;">🎉 NEW HIGH SCORE! 🎉</p>
+            <p class="highscore-text">Best: <span id="highscore">0</span></p>
             <p class="restart-hint">Tap anywhere to restart</p>
         </div>
     </div>
@@ -310,9 +329,12 @@
         const multValEl = document.getElementById('mult-val');
         const gameOverEl = document.getElementById('game-over');
         const finalScoreEl = document.getElementById('final-score');
+        const highscoreEl = document.getElementById('highscore');
+        const newHighscoreEl = document.getElementById('new-highscore');
 
         // Game State
         let score = 0;
+        let highScore = 0;
         let level = 1;
         let combo = 0;
         let isGameOver = false;
@@ -521,15 +543,16 @@
                             createFireworkBurst(c.x + c.width/2, canvas.height - 20, '#555555', 60);
                         }
                     });
-                    if (cityHit) audio.playCityHit();
+                    if (cityHit) {
+                      audio.playCityHit();
+                      if (cities.every(c => !c.isAlive)) endGame();
+                    }
                     else audio.playExplosion();
                     
                     const explosionColor = this.isFast ? '#ff00ff' : '#ff3300';
                     const explosionSize = this.isFast ? 80 : 40;
                     explosions.push(new Explosion(this.x, this.y, explosionColor, explosionSize, false));
                     createFireworkBurst(this.x, this.y, explosionColor, this.isFast ? 70 : 30);
-                    
-                    if (cities.every(c => !c.isAlive)) endGame();
                 }
             }
         }
@@ -743,7 +766,31 @@
             }
         }
 
+        // Load high score from localStorage
+        function loadHighScore() {
+            try {
+                const saved = localStorage.getItem('celestialGuardianHighScore');
+                if (saved !== null) {
+                    highScore = parseInt(saved, 10) || 0;
+                }
+            } catch (e) {
+                // localStorage may not be available
+                console.warn('Could not load high score:', e);
+            }
+        }
+
+        // Save high score to localStorage
+        function saveHighScore() {
+            try {
+                localStorage.setItem('celestialGuardianHighScore', highScore.toString());
+            } catch (e) {
+                // localStorage may not be available
+                console.warn('Could not save high score:', e);
+            }
+        }
+
         function init() {
+            loadHighScore();
             resize();
             window.addEventListener('resize', resize);
             
@@ -842,6 +889,18 @@
         function endGame() {
             isGameOver = true;
             finalScoreEl.innerText = score;
+            
+            // Check for new high score
+            const isNewHighScore = score > highScore;
+            if (isNewHighScore) {
+                highScore = score;
+                saveHighScore();
+            }
+            
+            // Update high score display
+            highscoreEl.innerText = highScore;
+            newHighscoreEl.style.display = isNewHighScore ? 'block' : 'none';
+            
             gameOverEl.style.display = 'block';
         }
 
