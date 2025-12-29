@@ -320,7 +320,8 @@
         let spawnTimer = 0;
         let spawnInterval = 2000;
         let screenShake = 0;
-        let missedCount = 0; // Track missed enemy missiles
+        let missedCount = 0;
+        let levelTimer = 0;
 
         // Entities
         let missiles = [];
@@ -777,6 +778,7 @@
             combo = 0;
             isGameOver = false;
             missedCount = 0;
+            levelTimer = 0;
             missiles = [];
             defenseMines = [];
             explosions = [];
@@ -863,11 +865,12 @@
 
             if (!isGameOver) {
                 spawnTimer += dt;
+                levelTimer += dt;
+                level = Math.floor(levelTimer / 14000 + score / 4000) + 1;
                 if (spawnTimer > spawnInterval) {
                     missiles.push(new EnemyMissile());
                     spawnTimer = 0;
-                    spawnInterval = Math.max(500, 2000 - (score * 2.0));
-                    level = Math.floor(score / 500) + 1;
+                    spawnInterval = Math.max(500, 2000 - (level * 300));
                 }
             }
 
