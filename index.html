@@ -42,7 +42,7 @@
             color: #fff;
         }
         #combo-container {
-            font-size: 0.85rem;
+            font-size: 1rem;
             color: #ffcc00;
             transition: all 0.3s ease;
             margin-top: 4px;
@@ -680,7 +680,7 @@
                                 }
                                 const basePoints = 10;
                                 const multiplier = 1 + (combo * 0.2);
-                                score += Math.floor(basePoints * multiplier);
+                                score += Math.floor(basePoints * (1 + level * 0.1) * multiplier);
                             } else {
                                 score += 10;
                             }
