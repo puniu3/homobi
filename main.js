@@ -3,6 +3,7 @@
  */
 
 import AudioManager from './audio.js';
+import { CONFIG } from './config.js';
 
 const audio = new AudioManager();
 
@@ -28,7 +29,7 @@ let combo = 0;
 let isGameOver = false;
 let lastTime = 0;
 let spawnTimer = 0;
-let spawnInterval = 2000;
+let spawnInterval = CONFIG.spawn.baseInterval;
 let screenShake = 0;
 let missedCount = 0;
 let levelTimer = 0;
@@ -127,12 +128,12 @@ class EnemyMissile {
 
         if (isFast) {
             // Extremely fast straight line - ~0.4-0.6 seconds to cross screen
-            const baseSpeed = 18 + Math.random() * 8;
+            const baseSpeed = CONFIG.missile.fast.baseSpeed + Math.random() * CONFIG.missile.fast.speedVariance;
             const angle = Math.atan2(this.targetY - this.startY, this.targetX - this.startX);
             this.vx = Math.cos(angle) * baseSpeed;
             this.vy = Math.sin(angle) * baseSpeed;
         } else {
-            const baseSpeed = 1 + (level * 0.15);
+            const baseSpeed = CONFIG.missile.normal.baseSpeed + (level * CONFIG.missile.normal.levelBonus);
             const angle = Math.atan2(this.targetY - this.startY, this.targetX - this.startX);
             this.vx = Math.cos(angle) * baseSpeed;
             this.vy = Math.sin(angle) * baseSpeed;
@@ -213,8 +214,8 @@ class EnemyMissile {
             // Count missed missiles (ground hit without destroying city counts too)
             missedCount++;
 
-            // Every 6 misses, spawn a fast missile targeting a city
-            if (missedCount >= 6) {
+            // Every N misses, spawn a fast missile targeting a city
+            if (missedCount >= CONFIG.penalty.missThreshold) {
                 missedCount = 0;
                 const liveCities = cities.filter(c => c.isAlive);
                 if (liveCities.length > 0) {
@@ -222,7 +223,7 @@ class EnemyMissile {
                 }
             }
 
-            screenShake = this.isFast ? 30 : 15;
+            screenShake = this.isFast ? CONFIG.missile.fast.screenShake : CONFIG.missile.normal.screenShake;
             let cityHit = false;
             cities.forEach(c => {
                 if (c.isAlive && Math.abs(this.x - (c.x + c.width/2)) < c.width) {
@@ -238,7 +239,7 @@ class EnemyMissile {
             else audio.playExplosion();
 
             const explosionColor = this.isFast ? '#ff00ff' : '#ff3300';
-            const explosionSize = this.isFast ? 80 : 40;
+            const explosionSize = this.isFast ? CONFIG.missile.fast.explosionRadius : CONFIG.missile.normal.explosionRadius;
             explosions.push(new Explosion(this.x, this.y, explosionColor, explosionSize, false));
             createFireworkBurst(this.x, this.y, explosionColor, this.isFast ? 70 : 30);
         }
@@ -253,7 +254,7 @@ class DefenseFirework {
         this.y = this.startY;
         this.targetX = tx;
         this.targetY = ty;
-        const speed = 11;
+        const speed = CONFIG.defense.speed;
         const angle = Math.atan2(ty - this.startY, tx - this.startX);
         this.vx = Math.cos(angle) * speed;
         this.vy = Math.sin(angle) * speed;
@@ -267,8 +268,7 @@ class DefenseFirework {
         particles.push(new Particle(this.x, this.y, this.color, 0.3, 1.0));
 
         // Check for direct hit with enemy missiles
-        // Visual size: defense=3, enemy=4, but hit detection is larger (15px radius)
-        const directHitRadius = 15;
+        const directHitRadius = CONFIG.directHitRadius;
         for (let m of missiles) {
             if (m.active) {
                 const d = Math.hypot(m.x - this.x, m.y - this.y);
@@ -278,14 +278,14 @@ class DefenseFirework {
                     this.active = false;
 
                     // Extra bonus for hitting fast missiles (the only way to stop them)
-                    const comboBonus = m.isFast ? 10 : 5;
-                    const basePoints = m.isFast ? 200 : 50;
+                    const comboBonus = m.isFast ? CONFIG.combo.directHitBonus.fast : CONFIG.combo.directHitBonus.normal;
+                    const basePoints = m.isFast ? CONFIG.scoring.directHit.fast : CONFIG.scoring.directHit.normal;
 
                     combo += comboBonus;
                     updateComboUI(true);
 
                     // Score with multiplier
-                    const multiplier = 1 + (combo * 0.2);
+                    const multiplier = 1 + (combo * CONFIG.combo.multiplierPerStack);
                     score += Math.floor(basePoints * multiplier);
 
                     // Special direct hit effects (extra intense for fast missiles)
@@ -303,7 +303,7 @@ class DefenseFirework {
         }
 
         const dist = Math.hypot(this.targetX - this.x, this.targetY - this.y);
-        if (dist < 12) {
+        if (dist < CONFIG.defense.arrivalDistance) {
             this.explode();
         }
     }
@@ -316,7 +316,7 @@ class DefenseFirework {
     explode() {
         this.active = false;
         audio.playExplosion();
-        explosions.push(new Explosion(this.x, this.y, this.color, 75, true));
+        explosions.push(new Explosion(this.x, this.y, this.color, CONFIG.defense.explosionRadius, true));
         createFireworkBurst(this.x, this.y, this.color, 120);
         for(let i=0; i<5; i++) {
             particles.push(new Particle(this.x, this.y, '#ffffff', Math.random()*8, 2.5));
@@ -358,7 +358,7 @@ class Explosion {
                 if (m.isFast) return;
 
                 const d = Math.hypot(m.x - this.x, m.y - this.y);
-                if (d < this.radius + 6) {
+                if (d < this.radius + CONFIG.missile.hitMargin) {
                     m.active = false;
 
                     if (this.isPlayer) {
@@ -366,11 +366,11 @@ class Explosion {
                             this.hasHitEnemy = true;
                             incrementCombo();
                         }
-                        const basePoints = 10;
-                        const multiplier = 1 + (combo * 0.2);
-                        score += Math.floor(basePoints * (1 + level * 0.1) * multiplier);
+                        const basePoints = CONFIG.scoring.explosionHit.base;
+                        const multiplier = 1 + (combo * CONFIG.combo.multiplierPerStack);
+                        score += Math.floor(basePoints * (1 + level * CONFIG.scoring.explosionHit.levelBonus) * multiplier);
                     } else {
-                        score += 10;
+                        score += CONFIG.scoring.chainHit;
                     }
 
                     audio.playExplosion(0.08);
@@ -441,7 +441,7 @@ function resetCombo() {
 }
 
 function decreaseCombo() {
-    combo = Math.floor(combo * .5);
+    combo = Math.floor(combo * CONFIG.combo.decayRate);
     updateComboUI(true);
 }
 
@@ -449,7 +449,7 @@ function updateComboUI(active) {
     if (combo > 0) {
         comboContainer.classList.remove('opacity-0');
         comboValEl.innerText = combo;
-        multValEl.innerText = (1 + combo * 0.2).toFixed(1);
+        multValEl.innerText = (1 + combo * CONFIG.combo.multiplierPerStack).toFixed(1);
         if (active) {
             comboContainer.classList.add('combo-pulse');
             setTimeout(() => comboContainer.classList.remove('combo-pulse'), 200);
@@ -517,7 +517,7 @@ function restartGame() {
     defenseMines = [];
     explosions = [];
     particles = [];
-    spawnInterval = 2000;
+    spawnInterval = CONFIG.spawn.baseInterval;
     gameOverEl.style.display = 'none';
     updateComboUI(false);
     cities = [];
@@ -615,11 +615,11 @@ function gameLoop(timestamp) {
     if (!isGameOver) {
         spawnTimer += dt;
         levelTimer += dt;
-        level = Math.floor(levelTimer / 14000 + score / 4000) + 1;
+        level = Math.floor(levelTimer / CONFIG.level.timeWeight + score / CONFIG.level.scoreWeight) + 1;
         if (spawnTimer > spawnInterval) {
             missiles.push(new EnemyMissile());
             spawnTimer = 0;
-            spawnInterval = Math.max(500, 2000 - (level * 300));
+            spawnInterval = Math.max(CONFIG.spawn.minInterval, CONFIG.spawn.baseInterval - (level * CONFIG.spawn.levelScale));
         }
     }
 

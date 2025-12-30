@@ -6,8 +6,9 @@ Missile defense game where players launch fireworks to intercept incoming threat
 
 - **index.html** - HTML markup only, loads `main.js` as module
 - **style.css** - All styles (HUD, game over screen, utilities)
+- **config.js** - `CONFIG` object with all balance-related values for tuning
 - **audio.js** - `AudioManager` class (Web Audio API sounds) - `export default`
-- **main.js** - Game logic, entities, rendering - imports `AudioManager`
+- **main.js** - Game logic, entities, rendering - imports `AudioManager`, `CONFIG`
 
 ## Key Entry Points
 
