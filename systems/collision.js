@@ -16,7 +16,8 @@ import {
  * @param {Object} state - Game state
  */
 function checkDefenseDirectHits(state) {
-    const directHitRadius = CONFIG.directHitRadius;
+    const { scale } = state;
+    const directHitRadius = CONFIG.directHitRadius * scale;
 
     for (const mine of state.defenseMines) {
         if (!mine.active) continue;
@@ -51,37 +52,37 @@ function checkDefenseDirectHits(state) {
                 });
 
                 // Special direct hit effects (extra intense for fast missiles)
-                createDirectHitEffect(state.particles, missile.x, missile.y);
+                createDirectHitEffect(state.particles, missile.x, missile.y, scale);
                 if (missile.isFast) {
                     // Extra spectacular effect for stopping fast missile
-                    createDirectHitEffect(state.particles, missile.x, missile.y);
-                    createFireworkBurst(state.particles, missile.x, missile.y, '#ff00ff', 100);
+                    createDirectHitEffect(state.particles, missile.x, missile.y, scale);
+                    createFireworkBurst(state.particles, missile.x, missile.y, '#ff00ff', 100, scale);
                 }
-                createFireworkBurst(state.particles, missile.x, missile.y, mine.color, 80);
+                createFireworkBurst(state.particles, missile.x, missile.y, mine.color, 80, scale);
                 return; // One hit per mine
             }
         }
 
         // Check if defense mine reached its target
         const dist = Math.hypot(mine.targetX - mine.x, mine.targetY - mine.y);
-        if (dist < CONFIG.defense.arrivalDistance) {
+        if (dist < CONFIG.defense.arrivalDistance * scale) {
             mine.active = false;
             state.soundBuffer.push({ type: 'explosion' });
             state.explosions.push(
-                createExplosion(mine.x, mine.y, mine.color, CONFIG.defense.explosionRadius, true)
+                createExplosion(mine.x, mine.y, mine.color, CONFIG.defense.explosionRadius * scale, true)
             );
-            createFireworkBurst(state.particles, mine.x, mine.y, mine.color, 120);
+            createFireworkBurst(state.particles, mine.x, mine.y, mine.color, 120, scale);
             // Add white sparkle particles
             for (let i = 0; i < 5; i++) {
                 state.particles.push({
                     x: mine.x,
                     y: mine.y,
                     color: '#ffffff',
-                    vx: (Math.random() - 0.5) * 16,
-                    vy: (Math.random() - 0.5) * 16,
+                    vx: (Math.random() - 0.5) * 16 * scale,
+                    vy: (Math.random() - 0.5) * 16 * scale,
                     alpha: 1,
                     friction: 0.95,
-                    gravity: 0.08,
+                    gravity: 0.08 * scale,
                     size: 2.5 + Math.random(),
                     active: true,
                     decay: 0.01 + Math.random() * 0.02,
@@ -96,6 +97,9 @@ function checkDefenseDirectHits(state) {
  * @param {Object} state - Game state
  */
 function checkExplosionHits(state) {
+    const { scale } = state;
+    const hitMargin = CONFIG.missile.hitMargin * scale;
+
     for (const explosion of state.explosions) {
         if (!explosion.active) continue;
 
@@ -106,7 +110,7 @@ function checkExplosionHits(state) {
             if (missile.isFast) continue;
 
             const d = Math.hypot(missile.x - explosion.x, missile.y - explosion.y);
-            if (d < explosion.radius + CONFIG.missile.hitMargin) {
+            if (d < explosion.radius + hitMargin) {
                 missile.active = false;
 
                 if (explosion.isPlayer) {
@@ -126,7 +130,7 @@ function checkExplosionHits(state) {
                 }
 
                 state.soundBuffer.push({ type: 'explosion', volume: 0.08 });
-                createFireworkBurst(state.particles, missile.x, missile.y, '#ffffff', 40);
+                createFireworkBurst(state.particles, missile.x, missile.y, '#ffffff', 40, scale);
             }
         }
     }
@@ -137,10 +141,12 @@ function checkExplosionHits(state) {
  * @param {Object} state - Game state
  */
 function checkMissileGroundHits(state) {
+    const { scale } = state;
+
     for (const missile of state.missiles) {
         if (!missile.active) continue;
 
-        if (missile.y >= state.canvasHeight - 5) {
+        if (missile.y >= state.canvasHeight - 5 * scale) {
             missile.active = false;
 
             // Count missed missiles
@@ -155,9 +161,9 @@ function checkMissileGroundHits(state) {
                 }
             }
 
-            state.screenShake = missile.isFast
+            state.screenShake = (missile.isFast
                 ? CONFIG.missile.fast.screenShake
-                : CONFIG.missile.normal.screenShake;
+                : CONFIG.missile.normal.screenShake) * scale;
 
             let cityHit = false;
             for (const city of state.cities) {
@@ -167,9 +173,10 @@ function checkMissileGroundHits(state) {
                     createFireworkBurst(
                         state.particles,
                         city.x + city.width / 2,
-                        state.canvasHeight - 20,
+                        state.canvasHeight - 20 * scale,
                         '#555555',
-                        60
+                        60,
+                        scale
                     );
                 }
             }
@@ -186,9 +193,9 @@ function checkMissileGroundHits(state) {
             }
 
             const explosionColor = missile.isFast ? '#ff00ff' : '#ff3300';
-            const explosionSize = missile.isFast
+            const explosionSize = (missile.isFast
                 ? CONFIG.missile.fast.explosionRadius
-                : CONFIG.missile.normal.explosionRadius;
+                : CONFIG.missile.normal.explosionRadius) * scale;
             state.explosions.push(
                 createExplosion(missile.x, missile.y, explosionColor, explosionSize, false)
             );
@@ -197,7 +204,8 @@ function checkMissileGroundHits(state) {
                 missile.x,
                 missile.y,
                 explosionColor,
-                missile.isFast ? 70 : 30
+                missile.isFast ? 70 : 30,
+                scale
             );
         }
     }

@@ -13,6 +13,9 @@ const COLORS = [
  * Create the initial game state
  */
 export function createInitialState(canvasWidth, canvasHeight) {
+    // Scale factor based on canvas height (reference: 750px)
+    const scale = canvasHeight / CONFIG.baseHeight;
+
     return {
         // Game data
         score: 0,
@@ -30,6 +33,7 @@ export function createInitialState(canvasWidth, canvasHeight) {
         // Canvas dimensions (for spawning/positioning)
         canvasWidth,
         canvasHeight,
+        scale,
 
         // Entity arrays (plain objects, not class instances)
         missiles: [],
@@ -72,24 +76,26 @@ export function resetStar(star, canvasWidth, canvasHeight) {
 /**
  * Create a city entity
  */
-export function createCity(x, width, canvasHeight) {
-    const height = 40 + Math.random() * 40;
+export function createCity(x, width, canvasHeight, scale = 1) {
+    const height = (40 + Math.random() * 40) * scale;
+    const scaledWidth = width * scale;
     const windows = [];
     for (let i = 0; i < 10; i++) {
         windows.push({
-            ox: 5 + Math.random() * (width - 10),
-            oy: 5 + Math.random() * (height - 10),
+            ox: (5 + Math.random() * (width - 10)) * scale,
+            oy: (5 + Math.random() * 30) * scale,  // relative to unscaled height range
             lit: Math.random() > 0.3
         });
     }
     return {
         x,
-        width,
+        width: scaledWidth,
         height,
         isAlive: true,
         color: '#1a1a2e',
         windows,
         canvasHeight, // needed for rendering
+        scale, // store for window rendering
     };
 }
 
@@ -97,11 +103,11 @@ export function createCity(x, width, canvasHeight) {
  * Create an enemy missile entity
  */
 export function createEnemyMissile(state, isFast = false) {
-    const { canvasWidth, canvasHeight, cities, level } = state;
+    const { canvasWidth, canvasHeight, cities, level, scale } = state;
     const liveCities = cities.filter(c => c.isAlive);
 
     const startX = Math.random() * canvasWidth;
-    const startY = -20;
+    const startY = -20 * scale;
     let targetX, targetY;
 
     if (isFast && liveCities.length > 0) {
@@ -121,12 +127,12 @@ export function createEnemyMissile(state, isFast = false) {
     let vx, vy;
     if (isFast) {
         // Extremely fast straight line - ~0.4-0.6 seconds to cross screen
-        const baseSpeed = CONFIG.missile.fast.baseSpeed + Math.random() * CONFIG.missile.fast.speedVariance;
+        const baseSpeed = (CONFIG.missile.fast.baseSpeed + Math.random() * CONFIG.missile.fast.speedVariance) * scale;
         const angle = Math.atan2(targetY - startY, targetX - startX);
         vx = Math.cos(angle) * baseSpeed;
         vy = Math.sin(angle) * baseSpeed;
     } else {
-        const baseSpeed = CONFIG.missile.normal.baseSpeed + (level * CONFIG.missile.normal.levelBonus);
+        const baseSpeed = (CONFIG.missile.normal.baseSpeed + (level * CONFIG.missile.normal.levelBonus)) * scale;
         const angle = Math.atan2(targetY - startY, targetX - startX);
         vx = Math.cos(angle) * baseSpeed;
         vy = Math.sin(angle) * baseSpeed;
@@ -151,11 +157,11 @@ export function createEnemyMissile(state, isFast = false) {
  * Create a defense firework entity
  */
 export function createDefenseFirework(state, targetX, targetY) {
-    const { canvasWidth, canvasHeight } = state;
+    const { canvasWidth, canvasHeight, scale } = state;
     const startX = canvasWidth / 2;
     const startY = canvasHeight;
 
-    const speed = CONFIG.defense.speed;
+    const speed = CONFIG.defense.speed * scale;
     const angle = Math.atan2(targetY - startY, targetX - startX);
     const vx = Math.cos(angle) * speed;
     const vy = Math.sin(angle) * speed;
@@ -194,21 +200,22 @@ export function createExplosion(x, y, color, maxRadius, isPlayer) {
 
 /**
  * Create a particle entity
+ * @param {number} scale - Screen scale factor for consistent particle behavior
  */
-export function createParticle(x, y, color, speedScale = 1, size = 1.5, overrides = {}) {
+export function createParticle(x, y, color, speedScale = 1, size = 1.5, overrides = {}, scale = 1) {
     const angle = Math.random() * Math.PI * 2;
-    const speed = (Math.random() * 5 + 2) * speedScale;
+    const speed = (Math.random() * 5 + 2) * speedScale * scale;
 
     return {
         x,
         y,
         color,
-        vx: overrides.vx !== undefined ? overrides.vx : Math.cos(angle) * speed,
-        vy: overrides.vy !== undefined ? overrides.vy : Math.sin(angle) * speed,
+        vx: overrides.vx !== undefined ? overrides.vx * scale : Math.cos(angle) * speed,
+        vy: overrides.vy !== undefined ? overrides.vy * scale : Math.sin(angle) * speed,
         alpha: 1,
         friction: overrides.friction !== undefined ? overrides.friction : 0.95,
-        gravity: overrides.gravity !== undefined ? overrides.gravity : 0.08,
-        size: size + Math.random(),
+        gravity: overrides.gravity !== undefined ? overrides.gravity * scale : 0.08 * scale,
+        size: size + Math.random(),  // size is scaled at render time
         active: true,
         decay: overrides.decay !== undefined ? overrides.decay : 0.01 + Math.random() * 0.02,
     };
@@ -217,21 +224,21 @@ export function createParticle(x, y, color, speedScale = 1, size = 1.5, override
 /**
  * Create particles for a firework burst
  */
-export function createFireworkBurst(particles, x, y, color, count) {
+export function createFireworkBurst(particles, x, y, color, count, scale = 1) {
     for (let i = 0; i < count; i++) {
-        particles.push(createParticle(x, y, color, 1.0));
+        particles.push(createParticle(x, y, color, 1.0, 1.5, {}, scale));
     }
 }
 
 /**
  * Create special direct hit effect particles
  */
-export function createDirectHitEffect(particles, x, y) {
+export function createDirectHitEffect(particles, x, y, scale = 1) {
     // Golden starburst pattern
     const colors = ['#ffcc00', '#ffffff', '#ff9900', '#ffff00'];
     for (let i = 0; i < 60; i++) {
         const color = colors[Math.floor(Math.random() * colors.length)];
-        particles.push(createParticle(x, y, color, 2.5, 3.0));
+        particles.push(createParticle(x, y, color, 2.5, 3.0, {}, scale));
     }
     // Ring of sparks
     for (let i = 0; i < 24; i++) {
@@ -242,14 +249,14 @@ export function createDirectHitEffect(particles, x, y) {
             gravity: 0,
             friction: 0.92,
             decay: 0.025,
-        }));
+        }, scale));
     }
     // Central flash particles
     for (let i = 0; i < 15; i++) {
         particles.push(createParticle(x, y, '#ffffff', 0.5, 5.0, {
             decay: 0.05,
             gravity: 0,
-        }));
+        }, scale));
     }
 }
 
