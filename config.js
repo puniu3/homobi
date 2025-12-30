@@ -4,6 +4,7 @@
  */
 
 const STORAGE_KEY = 'celestialGuardian_config';
+const CONFIG_VERSION = 1;
 
 /**
  * Default configuration values (immutable reference for reset)
@@ -110,7 +111,11 @@ function loadSavedConfig() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
-      return JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      if (parsed.configVersion !== CONFIG_VERSION) {
+        return null;
+      }
+      return parsed;
     }
   } catch (e) {
     console.warn('Could not load saved config:', e);
@@ -134,7 +139,8 @@ if (savedConfig) {
  */
 export function saveConfig(configObj) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(configObj));
+    const toSave = { ...configObj, configVersion: CONFIG_VERSION };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
     deepMerge(CONFIG, configObj);
   } catch (e) {
     console.warn('Could not save config:', e);
