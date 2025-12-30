@@ -1,11 +1,23 @@
-/**
- * AudioManager - Handles all game sound effects using Web Audio API
- */
 export default class AudioManager {
     constructor() {
         this.ctx = null;
         this.masterGain = null;
         this.enabled = false;
+        
+        // BGM State
+        this.bgmActive = false;
+        this.bgmTimeouts = [];
+        this.activeNodes = [];
+        
+        // Effects
+        this.bgmDelay = null;
+
+        // E Minor Pentatonic Scale for Night Sky Theme
+        this.scale = {
+            bass: [41.20, 49.00, 61.74, 73.42], // E1, G1, B1, D2
+            pad:  [82.41, 110.00, 146.83, 164.81], // E2, A2, D3, E3
+            star: [523.25, 659.25, 783.99, 987.77, 1174.66, 1318.51, 1567.98] // High range
+        };
     }
 
     init() {
@@ -15,8 +27,158 @@ export default class AudioManager {
         this.masterGain.gain.value = 0.3;
         this.masterGain.connect(this.ctx.destination);
         this.enabled = true;
+
+        // Initialize BGM Effects (Space Delay)
+        this.bgmDelay = this.ctx.createDelay();
+        this.bgmDelay.delayTime.value = 0.6; // 600ms
+        
+        const feedback = this.ctx.createGain();
+        feedback.gain.value = 0.45;
+
+        // Lowpass on delay to make echoes "distant"
+        const delayFilter = this.ctx.createBiquadFilter();
+        delayFilter.type = 'lowpass';
+        delayFilter.frequency.value = 800;
+
+        // Connect Delay Chain: Delay -> Filter -> Feedback -> Delay
+        this.bgmDelay.connect(delayFilter);
+        delayFilter.connect(feedback);
+        feedback.connect(this.bgmDelay);
+        
+        // Connect to Master
+        delayFilter.connect(this.masterGain);
+
         const hint = document.getElementById('audio-hint');
         if (hint) hint.style.display = 'none';
+
+        // Auto-start BGM
+        this.startBGM();
+    }
+
+    startBGM() {
+        if (!this.enabled || this.bgmActive) return;
+        this.bgmActive = true;
+        
+        // Layer 1: The Void (Deep Background)
+        this.loopLayer('void', 6000, 10000); 
+        
+        // Layer 2: Stars (Twinkling high notes)
+        this.loopLayer('star', 800, 3000); 
+    }
+
+    stopBGM() {
+        this.bgmActive = false;
+        this.bgmTimeouts.forEach(id => clearTimeout(id));
+        this.bgmTimeouts = [];
+
+        // Gentle fade out for active nodes
+        this.activeNodes.forEach(node => {
+            try {
+                if(node.gainParam) {
+                    node.gainParam.cancelScheduledValues(this.ctx.currentTime);
+                    node.gainParam.linearRampToValueAtTime(0, this.ctx.currentTime + 1.0);
+                }
+                setTimeout(() => { try { node.source.stop(); } catch(e){} }, 1100);
+            } catch(e) {}
+        });
+        this.activeNodes = [];
+    }
+
+    loopLayer(type, minTime, maxTime) {
+        if (!this.bgmActive) return;
+
+        const nextTime = Math.random() * (maxTime - minTime) + minTime;
+        
+        const id = setTimeout(() => {
+            if (type === 'void') this.playVoidPad();
+            if (type === 'star') this.playStarTwinkle();
+            this.loopLayer(type, minTime, maxTime);
+        }, nextTime);
+        
+        this.bgmTimeouts.push(id);
+    }
+
+    playVoidPad() {
+        if (!this.bgmActive) return;
+        
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const filter = this.ctx.createBiquadFilter();
+        const panner = this.ctx.createStereoPanner();
+
+        // Pick a low frequency
+        const freq = this.scale.bass[Math.floor(Math.random() * this.scale.bass.length)];
+
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+
+        // Breathing filter effect
+        filter.type = 'lowpass';
+        filter.frequency.value = 100;
+        filter.frequency.linearRampToValueAtTime(200, this.ctx.currentTime + 3);
+        filter.frequency.linearRampToValueAtTime(100, this.ctx.currentTime + 8);
+        
+        panner.pan.value = (Math.random() * 1.0) - 0.5;
+
+        // Long envelope
+        const now = this.ctx.currentTime;
+        const attack = 3.0;
+        const sustain = 4.0;
+        const release = 4.0;
+
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.2, now + attack);
+        gain.gain.setValueAtTime(0.2, now + attack + sustain);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + attack + sustain + release);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(panner);
+        panner.connect(this.masterGain);
+        
+        // Send to delay
+        const sendGain = this.ctx.createGain();
+        sendGain.gain.value = 0.3;
+        gain.connect(sendGain);
+        sendGain.connect(this.bgmDelay);
+
+        osc.start(now);
+        osc.stop(now + attack + sustain + release + 1);
+
+        this.activeNodes.push({ source: osc, gainParam: gain.gain });
+        // Clean up activeNodes array occasionally to prevent memory leak logic could be added here
+    }
+
+    playStarTwinkle() {
+        if (!this.bgmActive) return;
+
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const panner = this.ctx.createStereoPanner();
+
+        const freq = this.scale.star[Math.floor(Math.random() * this.scale.star.length)];
+
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+
+        panner.pan.value = (Math.random() * 1.8) - 0.9;
+
+        // Bell-like envelope
+        const now = this.ctx.currentTime;
+        const attack = 0.02;
+        const release = 1.0 + Math.random();
+
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.08, now + attack);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + attack + release);
+
+        osc.connect(gain);
+        gain.connect(panner);
+        panner.connect(this.masterGain);
+        panner.connect(this.bgmDelay);
+
+        osc.start(now);
+        osc.stop(now + attack + release + 1);
     }
 
     playLaunch() {
