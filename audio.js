@@ -33,7 +33,7 @@ export default class AudioManager {
 
         // 2. Initialize BGM Master Gain (Set to 70% volume)
         this.bgmMaster = this.ctx.createGain();
-        this.bgmMaster.gain.value = 0.2; 
+        this.bgmMaster.gain.value = 0.3; 
         this.bgmMaster.connect(this.masterGain);
 
         this.enabled = true;
