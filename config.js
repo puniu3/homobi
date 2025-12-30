@@ -46,6 +46,7 @@ export const CONFIG = {
       normal: 5,
       fast: 10,
     },
+    multiKillBonus: 1,
   },
 
   scoring: {
