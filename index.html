@@ -796,12 +796,6 @@
             
             const triggerInput = (e) => {
                 audio.init();
-                
-                // Unified Restart Logic
-                if (isGameOver) {
-                    restartGame();
-                    return;
-                }
 
                 const clientX = e.touches ? e.touches[0].clientX : e.clientX;
                 const clientY = e.touches ? e.touches[0].clientY : e.clientY;
