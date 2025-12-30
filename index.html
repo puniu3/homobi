@@ -11,22 +11,22 @@
     <canvas id="gameCanvas"></canvas>
 
     <div id="ui-layer">
-        <div class="flex justify-between items-start">
-            <div class="flex flex-col">
-                <div class="hud-text">Score <span id="score" class="score-val ml-2">0</span></div>
-                <div id="combo-container" class="opacity-0">
+        <div class="hud-row">
+            <div class="hud-left">
+                <div class="hud-text">Score <span id="score" class="score-val">0</span></div>
+                <div id="combo-container" class="combo-hidden">
                     <span id="combo-val">0</span>x Combo (<span id="mult-val">1.0</span>x)
                 </div>
             </div>
-            <div class="hud-text">Level <span id="level" class="score-val ml-2">1</span></div>
+            <div class="hud-text">Level <span id="level" class="score-val">1</span></div>
         </div>
 
         <div id="audio-hint">Click/Tap to enable Sound Effects</div>
 
         <div id="game-over">
-            <h1 class="text-4xl font-black mb-4 text-red-500 tracking-tighter">CITY FALLEN</h1>
-            <p class="text-lg mb-2 text-gray-400">The night sky has gone dark.</p>
-            <p class="text-3xl font-bold mt-4">Score: <span id="final-score">0</span></p>
+            <h1 class="game-over-title">CITY FALLEN</h1>
+            <p class="game-over-subtitle">The night sky has gone dark.</p>
+            <p class="final-score">Score: <span id="final-score">0</span></p>
             <p id="new-highscore" class="new-highscore" style="display: none;">🎉 NEW HIGH SCORE! 🎉</p>
             <p class="highscore-text">Best: <span id="highscore">0</span></p>
             <button class="btn" onclick="restartGame()">Rebuild City</button>
