@@ -48,8 +48,6 @@ const SLIDER_PARAMS = [
   { category: 'scoring.explosionHit', key: 'base', label: 'Base', min: 1, max: 50, step: 1 },
   { category: 'scoring.explosionHit', key: 'levelBonus', label: 'Level Bonus', min: 0, max: 0.5, step: 0.05 },
 
-  { category: 'scoring', key: 'chainHit', label: 'Chain Hit', min: 1, max: 50, step: 1 },
-
   { category: '(root)', key: 'directHitRadius', label: 'Direct Hit Radius', min: 5, max: 40, step: 1 },
 
   { category: 'penalty', key: 'missThreshold', label: 'Miss Threshold', min: 1, max: 20, step: 1 },

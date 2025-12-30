@@ -70,7 +70,6 @@ export const DEFAULT_CONFIG = {
       base: 10,
       levelBonus: 0.1,
     },
-    chainHit: 10, // non-player explosion hit
   },
 
   directHitRadius: 15,
