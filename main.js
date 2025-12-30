@@ -126,8 +126,9 @@ function restartGame() {
     previousCombo = 0;
     resetRenderCache();
 
-    // Create stars
-    for (let i = 0; i < 150; i++) {
+    // Create stars (density based on screen area)
+    const starCount = Math.floor(canvas.width * canvas.height * CONFIG.starDensity / 100);
+    for (let i = 0; i < starCount; i++) {
         state.stars.push(createStar(canvas.width, canvas.height));
     }
 

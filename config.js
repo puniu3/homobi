@@ -9,8 +9,12 @@ const STORAGE_KEY = 'celestialGuardian_config';
  * Default configuration values (immutable reference for reset)
  */
 export const DEFAULT_CONFIG = {
-  // Reference height for scaling (all sizes/speeds are tuned for this height)
+  // Reference dimensions for scaling (all sizes/speeds are tuned for these)
   baseHeight: 750,
+  baseWidth: 500,  // Reference width for star density
+
+  // Star density (stars per 100x100 px area at base dimensions)
+  starDensity: 0.04,  // 150 stars / (500 * 750) * 10000 ≈ 0.04
 
   spawn: {
     baseInterval: 2000,

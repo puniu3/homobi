@@ -24,6 +24,8 @@ function updateStars(state) {
  * @param {Object} state - Game state
  */
 function updateMissiles(state) {
+    const { scale } = state;
+
     for (const missile of state.missiles) {
         if (!missile.active) continue;
 
@@ -34,13 +36,13 @@ function updateMissiles(state) {
             missile.flicker += 0.8;
             // Intense particle trail
             for (let i = 0; i < 3; i++) {
-                state.particles.push(createParticle(missile.x, missile.y, '#ff00ff', 1.0, 1.8));
+                state.particles.push(createParticle(missile.x, missile.y, '#ff00ff', 1.0, 1.8, {}, scale));
             }
-            state.particles.push(createParticle(missile.x, missile.y, '#ffffff', 0.6, 1.2));
+            state.particles.push(createParticle(missile.x, missile.y, '#ffffff', 0.6, 1.2, {}, scale));
         } else {
             missile.flicker += 0.2;
             if (Math.random() > 0.3) {
-                state.particles.push(createParticle(missile.x, missile.y, '#ff4400', 0.6, 1.2));
+                state.particles.push(createParticle(missile.x, missile.y, '#ff4400', 0.6, 1.2, {}, scale));
             }
         }
     }
@@ -51,12 +53,14 @@ function updateMissiles(state) {
  * @param {Object} state - Game state
  */
 function updateDefenseMines(state) {
+    const { scale } = state;
+
     for (const mine of state.defenseMines) {
         if (!mine.active) continue;
 
         mine.x += mine.vx;
         mine.y += mine.vy;
-        state.particles.push(createParticle(mine.x, mine.y, mine.color, 0.3, 1.0));
+        state.particles.push(createParticle(mine.x, mine.y, mine.color, 0.3, 1.0, {}, scale));
     }
 }
 

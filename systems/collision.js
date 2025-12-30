@@ -52,13 +52,13 @@ function checkDefenseDirectHits(state) {
                 });
 
                 // Special direct hit effects (extra intense for fast missiles)
-                createDirectHitEffect(state.particles, missile.x, missile.y);
+                createDirectHitEffect(state.particles, missile.x, missile.y, scale);
                 if (missile.isFast) {
                     // Extra spectacular effect for stopping fast missile
-                    createDirectHitEffect(state.particles, missile.x, missile.y);
-                    createFireworkBurst(state.particles, missile.x, missile.y, '#ff00ff', 100);
+                    createDirectHitEffect(state.particles, missile.x, missile.y, scale);
+                    createFireworkBurst(state.particles, missile.x, missile.y, '#ff00ff', 100, scale);
                 }
-                createFireworkBurst(state.particles, missile.x, missile.y, mine.color, 80);
+                createFireworkBurst(state.particles, missile.x, missile.y, mine.color, 80, scale);
                 return; // One hit per mine
             }
         }
@@ -71,18 +71,18 @@ function checkDefenseDirectHits(state) {
             state.explosions.push(
                 createExplosion(mine.x, mine.y, mine.color, CONFIG.defense.explosionRadius * scale, true)
             );
-            createFireworkBurst(state.particles, mine.x, mine.y, mine.color, 120);
+            createFireworkBurst(state.particles, mine.x, mine.y, mine.color, 120, scale);
             // Add white sparkle particles
             for (let i = 0; i < 5; i++) {
                 state.particles.push({
                     x: mine.x,
                     y: mine.y,
                     color: '#ffffff',
-                    vx: (Math.random() - 0.5) * 16,
-                    vy: (Math.random() - 0.5) * 16,
+                    vx: (Math.random() - 0.5) * 16 * scale,
+                    vy: (Math.random() - 0.5) * 16 * scale,
                     alpha: 1,
                     friction: 0.95,
-                    gravity: 0.08,
+                    gravity: 0.08 * scale,
                     size: 2.5 + Math.random(),
                     active: true,
                     decay: 0.01 + Math.random() * 0.02,
@@ -130,7 +130,7 @@ function checkExplosionHits(state) {
                 }
 
                 state.soundBuffer.push({ type: 'explosion', volume: 0.08 });
-                createFireworkBurst(state.particles, missile.x, missile.y, '#ffffff', 40);
+                createFireworkBurst(state.particles, missile.x, missile.y, '#ffffff', 40, scale);
             }
         }
     }
@@ -173,9 +173,10 @@ function checkMissileGroundHits(state) {
                     createFireworkBurst(
                         state.particles,
                         city.x + city.width / 2,
-                        state.canvasHeight - 20,
+                        state.canvasHeight - 20 * scale,
                         '#555555',
-                        60
+                        60,
+                        scale
                     );
                 }
             }
@@ -203,7 +204,8 @@ function checkMissileGroundHits(state) {
                 missile.x,
                 missile.y,
                 explosionColor,
-                missile.isFast ? 70 : 30
+                missile.isFast ? 70 : 30,
+                scale
             );
         }
     }
