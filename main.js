@@ -133,7 +133,7 @@ function restartGame() {
 
     // Reset UI
     domElements.gameOverEl.style.display = 'none';
-    domElements.comboContainer.classList.add('opacity-0');
+    domElements.comboContainer.classList.add('combo-hidden');
 }
 
 // Expose restartGame globally for onclick handler

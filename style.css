@@ -40,6 +40,8 @@ canvas {
     color: #ffcc00;
     transition: all 0.3s ease;
     margin-top: 4px;
+}
+.combo-hidden {
     opacity: 0;
 }
 .combo-pulse {

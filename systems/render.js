@@ -137,11 +137,11 @@ function drawParticle(ctx, particle) {
  */
 function updateComboUI(state, comboContainer, comboValEl, multValEl) {
     if (state.combo > 0) {
-        comboContainer.classList.remove('opacity-0');
+        comboContainer.classList.remove('combo-hidden');
         comboValEl.innerText = state.combo;
         multValEl.innerText = (1 + state.combo * CONFIG.combo.multiplierPerStack).toFixed(1);
     } else {
-        comboContainer.classList.add('opacity-0');
+        comboContainer.classList.add('combo-hidden');
     }
 }
 
