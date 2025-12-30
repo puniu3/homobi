@@ -103,6 +103,9 @@ function checkExplosionHits(state) {
     for (const explosion of state.explosions) {
         if (!explosion.active) continue;
 
+        // Only player explosions can hit missiles
+        if (!explosion.isPlayer) continue;
+
         for (const missile of state.missiles) {
             if (!missile.active) continue;
 
@@ -113,21 +116,17 @@ function checkExplosionHits(state) {
             if (d < explosion.radius + hitMargin) {
                 missile.active = false;
 
-                if (explosion.isPlayer) {
-                    // Each kill contributes to combo, with bonus for multi-kills
-                    if (explosion.hasHitEnemy) {
-                        state.combo += CONFIG.combo.multiKillBonus;
-                    }
-                    explosion.hasHitEnemy = true;
-                    state.combo++;
-                    const basePoints = CONFIG.scoring.explosionHit.base;
-                    const multiplier = 1 + (state.combo * CONFIG.combo.multiplierPerStack);
-                    state.score += Math.floor(
-                        basePoints * (1 + state.level * CONFIG.scoring.explosionHit.levelBonus) * multiplier
-                    );
-                } else {
-                    state.score += CONFIG.scoring.chainHit;
+                // Each kill contributes to combo, with bonus for multi-kills
+                if (explosion.hasHitEnemy) {
+                    state.combo += CONFIG.combo.multiKillBonus;
                 }
+                explosion.hasHitEnemy = true;
+                state.combo++;
+                const basePoints = CONFIG.scoring.explosionHit.base;
+                const multiplier = 1 + (state.combo * CONFIG.combo.multiplierPerStack);
+                state.score += Math.floor(
+                    basePoints * (1 + state.level * CONFIG.scoring.explosionHit.levelBonus) * multiplier
+                );
 
                 state.soundBuffer.push({ type: 'explosion', volume: 0.08 });
                 createFireworkBurst(state.particles, missile.x, missile.y, '#ffffff', 40, scale);
