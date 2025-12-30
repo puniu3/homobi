@@ -25,10 +25,10 @@ export function resetRenderCache() {
 /**
  * Draw a star
  */
-function drawStar(ctx, star) {
+function drawStar(ctx, star, scale) {
     ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0, star.alpha)})`;
     ctx.beginPath();
-    ctx.arc(star.x, star.y, star.size, 0, TWO_PI);
+    ctx.arc(star.x, star.y, star.size * scale, 0, TWO_PI);
     ctx.fill();
 }
 
@@ -36,17 +36,19 @@ function drawStar(ctx, star) {
  * Draw a city
  */
 function drawCity(ctx, city, canvasHeight) {
+    const scale = city.scale || 1;
     if (!city.isAlive) {
         ctx.fillStyle = '#111';
-        ctx.fillRect(city.x, canvasHeight - 10, city.width, 10);
+        ctx.fillRect(city.x, canvasHeight - 10 * scale, city.width, 10 * scale);
         return;
     }
     ctx.fillStyle = city.color;
     ctx.fillRect(city.x, canvasHeight - city.height, city.width, city.height);
+    const windowSize = 3 * scale;
     city.windows.forEach(w => {
         if (w.lit) {
             ctx.fillStyle = '#ffcc00';
-            ctx.fillRect(city.x + w.ox, canvasHeight - city.height + w.oy, 3, 3);
+            ctx.fillRect(city.x + w.ox, canvasHeight - city.height + w.oy, windowSize, windowSize);
         }
     });
 }
@@ -54,12 +56,12 @@ function drawCity(ctx, city, canvasHeight) {
 /**
  * Draw an enemy missile
  */
-function drawMissile(ctx, missile) {
+function drawMissile(ctx, missile, scale) {
     ctx.save();
 
     if (missile.isFast) {
         // Fast missile: purple/magenta with intense pulsing glow
-        const glowSize = 20 + Math.sin(missile.flicker) * 10;
+        const glowSize = (20 + Math.sin(missile.flicker) * 10) * scale;
         const grad = ctx.createRadialGradient(
             missile.x, missile.y, 0,
             missile.x, missile.y, glowSize
@@ -76,15 +78,15 @@ function drawMissile(ctx, missile) {
         // Inner bright core
         ctx.fillStyle = '#ff88ff';
         ctx.beginPath();
-        ctx.arc(missile.x, missile.y, 6, 0, TWO_PI);
+        ctx.arc(missile.x, missile.y, 6 * scale, 0, TWO_PI);
         ctx.fill();
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.arc(missile.x, missile.y, 3, 0, TWO_PI);
+        ctx.arc(missile.x, missile.y, 3 * scale, 0, TWO_PI);
         ctx.fill();
     } else {
         // Normal missile: orange glow
-        const glowSize = 10 + Math.sin(missile.flicker) * 5;
+        const glowSize = (10 + Math.sin(missile.flicker) * 5) * scale;
         const grad = ctx.createRadialGradient(
             missile.x, missile.y, 0,
             missile.x, missile.y, glowSize
@@ -97,11 +99,11 @@ function drawMissile(ctx, missile) {
         ctx.fill();
         ctx.fillStyle = '#ff9900';
         ctx.beginPath();
-        ctx.arc(missile.x, missile.y, 4, 0, TWO_PI);
+        ctx.arc(missile.x, missile.y, 4 * scale, 0, TWO_PI);
         ctx.fill();
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.arc(missile.x, missile.y, 2, 0, TWO_PI);
+        ctx.arc(missile.x, missile.y, 2 * scale, 0, TWO_PI);
         ctx.fill();
     }
 
@@ -111,10 +113,10 @@ function drawMissile(ctx, missile) {
 /**
  * Draw a defense firework
  */
-function drawDefenseMine(ctx, mine) {
+function drawDefenseMine(ctx, mine, scale) {
     ctx.fillStyle = '#fff';
     ctx.beginPath();
-    ctx.arc(mine.x, mine.y, 3, 0, TWO_PI);
+    ctx.arc(mine.x, mine.y, 3 * scale, 0, TWO_PI);
     ctx.fill();
 }
 
@@ -122,7 +124,7 @@ function drawDefenseMine(ctx, mine) {
  * Draw an explosion
  * Note: globalAlpha reset is handled in render() after all alpha-based drawing
  */
-function drawExplosion(ctx, explosion) {
+function drawExplosion(ctx, explosion, scale) {
     // Prevent drawing with invalid radius (negative radius causes DOMException)
     if (explosion.radius <= 0 || explosion.alpha <= 0) return;
 
@@ -130,7 +132,7 @@ function drawExplosion(ctx, explosion) {
     ctx.arc(explosion.x, explosion.y, explosion.radius, 0, TWO_PI);
     ctx.strokeStyle = explosion.color;
     ctx.globalAlpha = explosion.alpha;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2 * scale;
     ctx.stroke();
 }
 
@@ -138,21 +140,22 @@ function drawExplosion(ctx, explosion) {
  * Draw a particle
  * Uses fillRect for small particles (size <= 2) for better performance
  */
-function drawParticle(ctx, particle) {
+function drawParticle(ctx, particle, scale) {
     // Prevent drawing with invalid alpha
     if (particle.alpha <= 0) return;
 
     ctx.globalAlpha = particle.alpha;
     ctx.fillStyle = Math.random() > 0.9 ? '#fff' : particle.color;
 
-    if (particle.size <= 2) {
+    const scaledSize = particle.size * scale;
+    if (scaledSize <= 2) {
         // Small particles: use faster fillRect
-        const size = particle.size * 2;
-        ctx.fillRect(particle.x - particle.size, particle.y - particle.size, size, size);
+        const size = scaledSize * 2;
+        ctx.fillRect(particle.x - scaledSize, particle.y - scaledSize, size, size);
     } else {
         // Larger particles: use arc for smooth circles
         ctx.beginPath();
-        ctx.arc(particle.x, particle.y, particle.size, 0, TWO_PI);
+        ctx.arc(particle.x, particle.y, scaledSize, 0, TWO_PI);
         ctx.fill();
     }
 }
@@ -197,9 +200,11 @@ export function render(ctx, state, domElements) {
         }
     }
 
+    const { scale } = state;
+
     // Draw stars
     for (const star of state.stars) {
-        drawStar(ctx, star);
+        drawStar(ctx, star, scale);
     }
 
     // Draw cities
@@ -210,28 +215,28 @@ export function render(ctx, state, domElements) {
     // Draw missiles
     for (const missile of state.missiles) {
         if (missile.active) {
-            drawMissile(ctx, missile);
+            drawMissile(ctx, missile, scale);
         }
     }
 
     // Draw defense mines
     for (const mine of state.defenseMines) {
         if (mine.active) {
-            drawDefenseMine(ctx, mine);
+            drawDefenseMine(ctx, mine, scale);
         }
     }
 
     // Draw explosions
     for (const explosion of state.explosions) {
         if (explosion.active) {
-            drawExplosion(ctx, explosion);
+            drawExplosion(ctx, explosion, scale);
         }
     }
 
     // Draw particles
     for (const particle of state.particles) {
         if (particle.active) {
-            drawParticle(ctx, particle);
+            drawParticle(ctx, particle, scale);
         }
     }
 

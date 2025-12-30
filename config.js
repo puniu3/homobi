@@ -9,6 +9,9 @@ const STORAGE_KEY = 'celestialGuardian_config';
  * Default configuration values (immutable reference for reset)
  */
 export const DEFAULT_CONFIG = {
+  // Reference height for scaling (all sizes/speeds are tuned for this height)
+  baseHeight: 750,
+
   spawn: {
     baseInterval: 2000,
     minInterval: 500,

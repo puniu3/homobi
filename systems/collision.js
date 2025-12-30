@@ -16,7 +16,8 @@ import {
  * @param {Object} state - Game state
  */
 function checkDefenseDirectHits(state) {
-    const directHitRadius = CONFIG.directHitRadius;
+    const { scale } = state;
+    const directHitRadius = CONFIG.directHitRadius * scale;
 
     for (const mine of state.defenseMines) {
         if (!mine.active) continue;
@@ -64,11 +65,11 @@ function checkDefenseDirectHits(state) {
 
         // Check if defense mine reached its target
         const dist = Math.hypot(mine.targetX - mine.x, mine.targetY - mine.y);
-        if (dist < CONFIG.defense.arrivalDistance) {
+        if (dist < CONFIG.defense.arrivalDistance * scale) {
             mine.active = false;
             state.soundBuffer.push({ type: 'explosion' });
             state.explosions.push(
-                createExplosion(mine.x, mine.y, mine.color, CONFIG.defense.explosionRadius, true)
+                createExplosion(mine.x, mine.y, mine.color, CONFIG.defense.explosionRadius * scale, true)
             );
             createFireworkBurst(state.particles, mine.x, mine.y, mine.color, 120);
             // Add white sparkle particles
@@ -96,6 +97,9 @@ function checkDefenseDirectHits(state) {
  * @param {Object} state - Game state
  */
 function checkExplosionHits(state) {
+    const { scale } = state;
+    const hitMargin = CONFIG.missile.hitMargin * scale;
+
     for (const explosion of state.explosions) {
         if (!explosion.active) continue;
 
@@ -106,7 +110,7 @@ function checkExplosionHits(state) {
             if (missile.isFast) continue;
 
             const d = Math.hypot(missile.x - explosion.x, missile.y - explosion.y);
-            if (d < explosion.radius + CONFIG.missile.hitMargin) {
+            if (d < explosion.radius + hitMargin) {
                 missile.active = false;
 
                 if (explosion.isPlayer) {
@@ -137,10 +141,12 @@ function checkExplosionHits(state) {
  * @param {Object} state - Game state
  */
 function checkMissileGroundHits(state) {
+    const { scale } = state;
+
     for (const missile of state.missiles) {
         if (!missile.active) continue;
 
-        if (missile.y >= state.canvasHeight - 5) {
+        if (missile.y >= state.canvasHeight - 5 * scale) {
             missile.active = false;
 
             // Count missed missiles
@@ -155,9 +161,9 @@ function checkMissileGroundHits(state) {
                 }
             }
 
-            state.screenShake = missile.isFast
+            state.screenShake = (missile.isFast
                 ? CONFIG.missile.fast.screenShake
-                : CONFIG.missile.normal.screenShake;
+                : CONFIG.missile.normal.screenShake) * scale;
 
             let cityHit = false;
             for (const city of state.cities) {
@@ -186,9 +192,9 @@ function checkMissileGroundHits(state) {
             }
 
             const explosionColor = missile.isFast ? '#ff00ff' : '#ff3300';
-            const explosionSize = missile.isFast
+            const explosionSize = (missile.isFast
                 ? CONFIG.missile.fast.explosionRadius
-                : CONFIG.missile.normal.explosionRadius;
+                : CONFIG.missile.normal.explosionRadius) * scale;
             state.explosions.push(
                 createExplosion(missile.x, missile.y, explosionColor, explosionSize, false)
             );

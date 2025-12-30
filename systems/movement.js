@@ -65,16 +65,20 @@ function updateDefenseMines(state) {
  * @param {Object} state - Game state
  */
 function updateExplosions(state) {
+    const { scale } = state;
+    const growSpeed = 5 * scale;
+    const shrinkSpeed = 1.8 * scale;
+
     for (const explosion of state.explosions) {
         if (!explosion.active) continue;
 
         if (explosion.growing) {
-            explosion.radius += 5;
+            explosion.radius += growSpeed;
             if (explosion.radius >= explosion.maxRadius) {
                 explosion.growing = false;
             }
         } else {
-            explosion.radius -= 1.8;
+            explosion.radius -= shrinkSpeed;
             explosion.alpha -= 0.01;
             if (explosion.radius <= 0 || explosion.alpha <= 0) {
                 explosion.active = false;

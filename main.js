@@ -78,6 +78,7 @@ function resize() {
     if (state) {
         state.canvasWidth = canvas.width;
         state.canvasHeight = canvas.height;
+        state.scale = canvas.height / CONFIG.baseHeight;
         state.stars.forEach(s => resetStar(s, canvas.width, canvas.height));
     }
 }
@@ -132,9 +133,10 @@ function restartGame() {
 
     // Create cities
     const cityCount = 6;
+    const cityWidth = 50;  // base width before scaling
     const spacing = canvas.width / (cityCount + 1);
     for (let i = 1; i <= cityCount; i++) {
-        state.cities.push(createCity(i * spacing - 25, 50, canvas.height));
+        state.cities.push(createCity(i * spacing - (cityWidth * state.scale) / 2, cityWidth, canvas.height, state.scale));
     }
 
     // Reset UI
