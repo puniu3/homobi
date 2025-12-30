@@ -11,7 +11,7 @@ const STORAGE_KEY = 'celestialGuardian_config';
 export const DEFAULT_CONFIG = {
   // Reference dimensions for scaling (all sizes/speeds are tuned for these)
   baseHeight: 750,
-  baseWidth: 500,  // Reference width for star density
+  baseWidth: 2400,  // Reference width for star density
 
   // Star density (stars per 100x100 px area at base dimensions)
   starDensity: 0.04,  // 150 stars / (500 * 750) * 10000 ≈ 0.04
@@ -24,7 +24,7 @@ export const DEFAULT_CONFIG = {
 
   level: {
     timeWeight: 14000,
-    scoreWeight: 4000,
+    scoreWeight: 8000,
   },
 
   missile: {
