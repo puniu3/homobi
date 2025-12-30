@@ -15,7 +15,7 @@ import { processInput } from './systems/input.js';
 import { updateSpawning } from './systems/spawn.js';
 import { updateMovement } from './systems/movement.js';
 import { updateCollisions } from './systems/collision.js';
-import { render, pulseCombo } from './systems/render.js';
+import { render, pulseCombo, resetRenderCache } from './systems/render.js';
 import { flushSounds } from './systems/sound.js';
 
 // Audio manager instance
@@ -118,6 +118,7 @@ function restartGame() {
     state = createInitialState(canvas.width, canvas.height);
     state.highScore = loadHighScore();
     previousCombo = 0;
+    resetRenderCache();
 
     // Create stars
     for (let i = 0; i < 150; i++) {
