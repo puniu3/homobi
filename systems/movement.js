@@ -80,7 +80,7 @@ function updateExplosions(state) {
                 explosion.active = false;
                 // Decay combo if player explosion didn't hit any enemy
                 if (explosion.isPlayer && !explosion.hasHitEnemy) {
-                    state.combo = Math.floor(state.combo * CONFIG.combo.decayRate);
+                    state.combo = Math.floor(state.combo * CONFIG.combo.decayRateOnMiss);
                 }
             }
         }
