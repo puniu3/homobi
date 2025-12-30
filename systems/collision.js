@@ -174,11 +174,13 @@ function checkMissileGroundHits(state) {
 
             if (cityHit) {
                 state.soundBuffer.push({ type: 'cityHit' });
+                state.combo = Math.floor(state.combo * CONFIG.combo.decayRateOnCityHit);
                 if (state.cities.every(c => !c.isAlive)) {
                     state.isGameOver = true;
                 }
             } else {
                 state.soundBuffer.push({ type: 'explosion' });
+                state.combo = Math.floor(state.combo * CONFIG.combo.decayRateOnGroundHit);
             }
 
             const explosionColor = missile.isFast ? '#ff00ff' : '#ff3300';
