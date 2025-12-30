@@ -121,6 +121,7 @@ function init() {
 function restartGame() {
     state = createInitialState(canvas.width, canvas.height);
     state.highScore = loadHighScore();
+    state.lastTime = performance.now();
     previousCombo = 0;
     resetRenderCache();
 
