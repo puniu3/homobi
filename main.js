@@ -1,498 +1,103 @@
 /**
  * Celestial Guardian: Firework Defense
+ * Main entry point - game loop, initialization, and event handlers
  */
 
 import AudioManager from './audio.js';
 import { CONFIG } from './config.js';
+import {
+    createInitialState,
+    createStar,
+    resetStar,
+    createCity,
+} from './state.js';
+import { processInput } from './systems/input.js';
+import { updateSpawning } from './systems/spawn.js';
+import { updateMovement } from './systems/movement.js';
+import { updateCollisions } from './systems/collision.js';
+import { render, pulseCombo } from './systems/render.js';
+import { flushSounds } from './systems/sound.js';
 
+// Audio manager instance
 const audio = new AudioManager();
 
-// --- GAME LOGIC ---
-
+// Canvas and context
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-const scoreEl = document.getElementById('score');
-const levelEl = document.getElementById('level');
-const comboContainer = document.getElementById('combo-container');
-const comboValEl = document.getElementById('combo-val');
-const multValEl = document.getElementById('mult-val');
-const gameOverEl = document.getElementById('game-over');
-const finalScoreEl = document.getElementById('final-score');
-const highscoreEl = document.getElementById('highscore');
-const newHighscoreEl = document.getElementById('new-highscore');
 
-// Game State
-let score = 0;
-let highScore = 0;
-let level = 1;
-let combo = 0;
-let isGameOver = false;
-let lastTime = 0;
-let spawnTimer = 0;
-let spawnInterval = CONFIG.spawn.baseInterval;
-let screenShake = 0;
-let missedCount = 0;
-let levelTimer = 0;
+// DOM elements for UI updates
+const domElements = {
+    scoreEl: document.getElementById('score'),
+    levelEl: document.getElementById('level'),
+    comboContainer: document.getElementById('combo-container'),
+    comboValEl: document.getElementById('combo-val'),
+    multValEl: document.getElementById('mult-val'),
+    gameOverEl: document.getElementById('game-over'),
+    finalScoreEl: document.getElementById('final-score'),
+    highscoreEl: document.getElementById('highscore'),
+    newHighscoreEl: document.getElementById('new-highscore'),
+};
 
-// Entities
-let missiles = [];
-let defenseMines = [];
-let explosions = [];
-let particles = [];
-let cities = [];
-let stars = [];
+// Game state
+let state = null;
+let previousCombo = 0;
 
-const COLORS = [
-    '#ff0055', '#00ffcc', '#ffcc00', '#ff00ff', '#0099ff', '#ffffff', '#ff6600'
-];
-
-class Star {
-    constructor() {
-        this.reset();
-    }
-    reset() {
-        this.x = Math.random() * canvas.width;
-        this.y = Math.random() * (canvas.height * 0.7);
-        this.size = Math.random() * 1.5;
-        this.blinkSpeed = 0.01 + Math.random() * 0.05;
-        this.alpha = Math.random();
-    }
-    draw() {
-        this.alpha += this.blinkSpeed;
-        if (this.alpha > 1 || this.alpha < 0) this.blinkSpeed *= -1;
-        ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0, this.alpha)})`;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
-    }
-}
-
-class City {
-    constructor(x, width) {
-        this.x = x;
-        this.width = width;
-        this.height = 40 + Math.random() * 40;
-        this.isAlive = true;
-        this.color = '#1a1a2e';
-        this.windows = [];
-        for(let i=0; i<10; i++) {
-            this.windows.push({
-                ox: 5 + Math.random() * (width - 10),
-                oy: 5 + Math.random() * (this.height - 10),
-                lit: Math.random() > 0.3
-            });
-        }
-    }
-    draw() {
-        if (!this.isAlive) {
-            ctx.fillStyle = '#111';
-            ctx.fillRect(this.x, canvas.height - 10, this.width, 10);
-            return;
-        }
-        ctx.fillStyle = this.color;
-        ctx.fillRect(this.x, canvas.height - this.height, this.width, this.height);
-        this.windows.forEach(w => {
-            if (w.lit) {
-                ctx.fillStyle = '#ffcc00';
-                ctx.fillRect(this.x + w.ox, canvas.height - this.height + w.oy, 3, 3);
-            }
-        });
-    }
-}
-
-class EnemyMissile {
-    constructor(isFast = false) {
-        this.isFast = isFast;
-        this.startX = Math.random() * canvas.width;
-        this.startY = -20;
-        const liveCities = cities.filter(c => c.isAlive);
-
-        if (isFast && liveCities.length > 0) {
-            // Fast missile always targets a living city precisely
-            const targetCity = liveCities[Math.floor(Math.random() * liveCities.length)];
-            this.targetX = targetCity.x + targetCity.width / 2;
-            this.targetY = canvas.height - targetCity.height / 2;
-        } else if (liveCities.length > 0 && Math.random() > 0.3) {
-            const targetCity = liveCities[Math.floor(Math.random() * liveCities.length)];
-            this.targetX = targetCity.x + targetCity.width / 2;
-            this.targetY = canvas.height;
-        } else {
-            this.targetX = Math.random() * canvas.width;
-            this.targetY = canvas.height;
-        }
-
-        this.x = this.startX;
-        this.y = this.startY;
-        this.active = true;
-        this.flicker = 0;
-
-        if (isFast) {
-            // Extremely fast straight line - ~0.4-0.6 seconds to cross screen
-            const baseSpeed = CONFIG.missile.fast.baseSpeed + Math.random() * CONFIG.missile.fast.speedVariance;
-            const angle = Math.atan2(this.targetY - this.startY, this.targetX - this.startX);
-            this.vx = Math.cos(angle) * baseSpeed;
-            this.vy = Math.sin(angle) * baseSpeed;
-        } else {
-            const baseSpeed = CONFIG.missile.normal.baseSpeed + (level * CONFIG.missile.normal.levelBonus);
-            const angle = Math.atan2(this.targetY - this.startY, this.targetX - this.startX);
-            this.vx = Math.cos(angle) * baseSpeed;
-            this.vy = Math.sin(angle) * baseSpeed;
-        }
-    }
-    update() {
-        this.x += this.vx;
-        this.y += this.vy;
-
-        if (this.isFast) {
-            this.flicker += 0.8;
-            // Intense particle trail
-            for (let i = 0; i < 3; i++) {
-                particles.push(new Particle(this.x, this.y, '#ff00ff', 1.0, 1.8));
-            }
-            particles.push(new Particle(this.x, this.y, '#ffffff', 0.6, 1.2));
-        } else {
-            this.flicker += 0.2;
-            if (Math.random() > 0.3) {
-                particles.push(new Particle(this.x, this.y, '#ff4400', 0.6, 1.2));
-            }
-        }
-
-        if (this.y >= canvas.height - 5) {
-            this.explode(true);
-        }
-    }
-    draw() {
-        ctx.save();
-
-        if (this.isFast) {
-            // Fast missile: purple/magenta with intense pulsing glow
-            const glowSize = 20 + Math.sin(this.flicker) * 10;
-            const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, glowSize);
-            grad.addColorStop(0, 'rgba(255, 0, 255, 1.0)');
-            grad.addColorStop(0.3, 'rgba(255, 100, 255, 0.7)');
-            grad.addColorStop(0.6, 'rgba(200, 0, 255, 0.4)');
-            grad.addColorStop(1, 'rgba(255, 0, 255, 0)');
-            ctx.fillStyle = grad;
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, glowSize, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Inner bright core
-            ctx.fillStyle = '#ff88ff';
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, 6, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = '#ffffff';
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
-            ctx.fill();
-        } else {
-            // Normal missile: orange glow
-            const glowSize = 10 + Math.sin(this.flicker) * 5;
-            const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, glowSize);
-            grad.addColorStop(0, 'rgba(255, 68, 0, 0.8)');
-            grad.addColorStop(1, 'rgba(255, 68, 0, 0)');
-            ctx.fillStyle = grad;
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, glowSize, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = '#ff9900';
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, 4, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = '#ffffff';
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        ctx.restore();
-    }
-    explode(hitGround) {
-        this.active = false;
-        if (hitGround) {
-            // Count missed missiles (ground hit without destroying city counts too)
-            missedCount++;
-
-            // Every N misses, spawn a fast missile targeting a city
-            if (missedCount >= CONFIG.penalty.missThreshold) {
-                missedCount = 0;
-                const liveCities = cities.filter(c => c.isAlive);
-                if (liveCities.length > 0) {
-                    missiles.push(new EnemyMissile(true));
-                }
-            }
-
-            screenShake = this.isFast ? CONFIG.missile.fast.screenShake : CONFIG.missile.normal.screenShake;
-            let cityHit = false;
-            cities.forEach(c => {
-                if (c.isAlive && Math.abs(this.x - (c.x + c.width/2)) < c.width) {
-                    c.isAlive = false;
-                    cityHit = true;
-                    createFireworkBurst(c.x + c.width/2, canvas.height - 20, '#555555', 60);
-                }
-            });
-            if (cityHit) {
-              audio.playCityHit();
-              if (cities.every(c => !c.isAlive)) endGame();
-            }
-            else audio.playExplosion();
-
-            const explosionColor = this.isFast ? '#ff00ff' : '#ff3300';
-            const explosionSize = this.isFast ? CONFIG.missile.fast.explosionRadius : CONFIG.missile.normal.explosionRadius;
-            explosions.push(new Explosion(this.x, this.y, explosionColor, explosionSize, false));
-            createFireworkBurst(this.x, this.y, explosionColor, this.isFast ? 70 : 30);
-        }
-    }
-}
-
-class DefenseFirework {
-    constructor(tx, ty) {
-        this.startX = canvas.width / 2;
-        this.startY = canvas.height;
-        this.x = this.startX;
-        this.y = this.startY;
-        this.targetX = tx;
-        this.targetY = ty;
-        const speed = CONFIG.defense.speed;
-        const angle = Math.atan2(ty - this.startY, tx - this.startX);
-        this.vx = Math.cos(angle) * speed;
-        this.vy = Math.sin(angle) * speed;
-        this.active = true;
-        this.color = COLORS[Math.floor(Math.random() * COLORS.length)];
-        audio.playLaunch();
-    }
-    update() {
-        this.x += this.vx;
-        this.y += this.vy;
-        particles.push(new Particle(this.x, this.y, this.color, 0.3, 1.0));
-
-        // Check for direct hit with enemy missiles
-        const directHitRadius = CONFIG.directHitRadius;
-        for (let m of missiles) {
-            if (m.active) {
-                const d = Math.hypot(m.x - this.x, m.y - this.y);
-                if (d < directHitRadius) {
-                    // Direct hit!
-                    m.active = false;
-                    this.active = false;
-
-                    // Extra bonus for hitting fast missiles (the only way to stop them)
-                    const comboBonus = m.isFast ? CONFIG.combo.directHitBonus.fast : CONFIG.combo.directHitBonus.normal;
-                    const basePoints = m.isFast ? CONFIG.scoring.directHit.fast : CONFIG.scoring.directHit.normal;
-
-                    combo += comboBonus;
-                    updateComboUI(true);
-
-                    // Score with multiplier
-                    const multiplier = 1 + (combo * CONFIG.combo.multiplierPerStack);
-                    score += Math.floor(basePoints * multiplier);
-
-                    // Special direct hit effects (extra intense for fast missiles)
-                    audio.playExplosion(m.isFast ? 0.35 : 0.25);
-                    createDirectHitEffect(m.x, m.y);
-                    if (m.isFast) {
-                        // Extra spectacular effect for stopping fast missile
-                        createDirectHitEffect(m.x, m.y);
-                        createFireworkBurst(m.x, m.y, '#ff00ff', 100);
-                    }
-                    createFireworkBurst(m.x, m.y, this.color, 80);
-                    return;
-                }
-            }
-        }
-
-        const dist = Math.hypot(this.targetX - this.x, this.targetY - this.y);
-        if (dist < CONFIG.defense.arrivalDistance) {
-            this.explode();
-        }
-    }
-    draw() {
-        ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
-        ctx.fill();
-    }
-    explode() {
-        this.active = false;
-        audio.playExplosion();
-        explosions.push(new Explosion(this.x, this.y, this.color, CONFIG.defense.explosionRadius, true));
-        createFireworkBurst(this.x, this.y, this.color, 120);
-        for(let i=0; i<5; i++) {
-            particles.push(new Particle(this.x, this.y, '#ffffff', Math.random()*8, 2.5));
-        }
-    }
-}
-
-class Explosion {
-    constructor(x, y, color, maxRadius, isPlayer) {
-        this.x = x;
-        this.y = y;
-        this.color = color;
-        this.radius = 0;
-        this.maxRadius = maxRadius;
-        this.active = true;
-        this.growing = true;
-        this.alpha = 0.4;
-        this.isPlayer = isPlayer;
-        this.hasHitEnemy = false;
-    }
-    update() {
-        if (this.growing) {
-            this.radius += 5;
-            if (this.radius >= this.maxRadius) this.growing = false;
-        } else {
-            this.radius -= 1.8;
-            this.alpha -= 0.01;
-            if (this.radius <= 0 || this.alpha <= 0) {
-                this.active = false;
-                if (this.isPlayer && !this.hasHitEnemy) {
-                    decreaseCombo();
-                }
-            }
-        }
-
-        missiles.forEach(m => {
-            if (m.active) {
-                // Fast missiles are immune to explosion radius - only direct hit works
-                if (m.isFast) return;
-
-                const d = Math.hypot(m.x - this.x, m.y - this.y);
-                if (d < this.radius + CONFIG.missile.hitMargin) {
-                    m.active = false;
-
-                    if (this.isPlayer) {
-                        if (!this.hasHitEnemy) {
-                            this.hasHitEnemy = true;
-                            incrementCombo();
-                        }
-                        const basePoints = CONFIG.scoring.explosionHit.base;
-                        const multiplier = 1 + (combo * CONFIG.combo.multiplierPerStack);
-                        score += Math.floor(basePoints * (1 + level * CONFIG.scoring.explosionHit.levelBonus) * multiplier);
-                    } else {
-                        score += CONFIG.scoring.chainHit;
-                    }
-
-                    audio.playExplosion(0.08);
-                    createFireworkBurst(m.x, m.y, '#ffffff', 40);
-                }
-            }
-        });
-    }
-    draw() {
-        // Prevent drawing with invalid radius (negative radius causes DOMException)
-        if (this.radius <= 0 || this.alpha <= 0) return;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.strokeStyle = this.color;
-        ctx.globalAlpha = this.alpha;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        ctx.globalAlpha = 1.0;
-    }
-}
-
-class Particle {
-    constructor(x, y, color, speedScale = 1, size = 1.5) {
-        this.x = x;
-        this.y = y;
-        this.color = color;
-        const angle = Math.random() * Math.PI * 2;
-        const speed = (Math.random() * 5 + 2) * speedScale;
-        this.vx = Math.cos(angle) * speed;
-        this.vy = Math.sin(angle) * speed;
-        this.alpha = 1;
-        this.friction = 0.95;
-        this.gravity = 0.08;
-        this.size = size + Math.random();
-        this.active = true;
-        this.decay = 0.01 + Math.random() * 0.02;
-    }
-    update() {
-        this.vx *= this.friction;
-        this.vy *= this.friction;
-        this.vy += this.gravity;
-        this.x += this.vx;
-        this.y += this.vy;
-        this.alpha -= this.decay;
-        if (this.alpha <= 0) this.active = false;
-    }
-    draw() {
-        // Prevent drawing with invalid alpha
-        if (this.alpha <= 0) return;
-        ctx.globalAlpha = this.alpha;
-        ctx.fillStyle = this.color;
-        if (Math.random() > 0.9) ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1.0;
-    }
-}
-
-function incrementCombo() {
-    combo++;
-    updateComboUI(true);
-}
-
-function resetCombo() {
-    combo = 0;
-    updateComboUI(false);
-}
-
-function decreaseCombo() {
-    combo = Math.floor(combo * CONFIG.combo.decayRate);
-    updateComboUI(true);
-}
-
-function updateComboUI(active) {
-    if (combo > 0) {
-        comboContainer.classList.remove('opacity-0');
-        comboValEl.innerText = combo;
-        multValEl.innerText = (1 + combo * CONFIG.combo.multiplierPerStack).toFixed(1);
-        if (active) {
-            comboContainer.classList.add('combo-pulse');
-            setTimeout(() => comboContainer.classList.remove('combo-pulse'), 200);
-        }
-    } else {
-        comboContainer.classList.add('opacity-0');
-    }
-}
-
-// Load high score from localStorage
+/**
+ * Load high score from localStorage
+ */
 function loadHighScore() {
     try {
         const saved = localStorage.getItem('celestialGuardianHighScore');
         if (saved !== null) {
-            highScore = parseInt(saved, 10) || 0;
+            return parseInt(saved, 10) || 0;
         }
     } catch (e) {
-        // localStorage may not be available
         console.warn('Could not load high score:', e);
     }
+    return 0;
 }
 
-// Save high score to localStorage
-function saveHighScore() {
+/**
+ * Save high score to localStorage
+ */
+function saveHighScore(highScore) {
     try {
         localStorage.setItem('celestialGuardianHighScore', highScore.toString());
     } catch (e) {
-        // localStorage may not be available
         console.warn('Could not save high score:', e);
     }
 }
 
+/**
+ * Initialize canvas size
+ */
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    if (state) {
+        state.canvasWidth = canvas.width;
+        state.canvasHeight = canvas.height;
+        state.stars.forEach(s => resetStar(s, canvas.width, canvas.height));
+    }
+}
+
+/**
+ * Initialize the game
+ */
 function init() {
-    loadHighScore();
     resize();
     window.addEventListener('resize', resize);
 
+    // Input event handlers - buffer input, don't process directly
     const triggerInput = (e) => {
         audio.init();
 
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        handleLaunch(clientX, clientY);
+
+        if (state) {
+            state.inputBuffer.push({ type: 'launch', x: clientX, y: clientY });
+        }
     };
 
     canvas.addEventListener('mousedown', triggerInput);
@@ -501,145 +106,84 @@ function init() {
         triggerInput(e);
     }, { passive: false });
 
-    for(let i=0; i<150; i++) stars.push(new Star());
+    // Start the game
     restartGame();
     requestAnimationFrame(gameLoop);
 }
 
+/**
+ * Restart the game with fresh state
+ */
 function restartGame() {
-    score = 0;
-    level = 1;
-    combo = 0;
-    isGameOver = false;
-    missedCount = 0;
-    levelTimer = 0;
-    missiles = [];
-    defenseMines = [];
-    explosions = [];
-    particles = [];
-    spawnInterval = CONFIG.spawn.baseInterval;
-    gameOverEl.style.display = 'none';
-    updateComboUI(false);
-    cities = [];
+    state = createInitialState(canvas.width, canvas.height);
+    state.highScore = loadHighScore();
+    previousCombo = 0;
+
+    // Create stars
+    for (let i = 0; i < 150; i++) {
+        state.stars.push(createStar(canvas.width, canvas.height));
+    }
+
+    // Create cities
     const cityCount = 6;
     const spacing = canvas.width / (cityCount + 1);
-    for(let i=1; i<=cityCount; i++) {
-        cities.push(new City(i * spacing - 25, 50));
+    for (let i = 1; i <= cityCount; i++) {
+        state.cities.push(createCity(i * spacing - 25, 50, canvas.height));
     }
+
+    // Reset UI
+    domElements.gameOverEl.style.display = 'none';
+    domElements.comboContainer.classList.add('opacity-0');
 }
 
 // Expose restartGame globally for onclick handler
 window.restartGame = restartGame;
 
-function resize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    stars.forEach(s => s.reset());
-}
-
-function handleLaunch(x, y) {
-    if (isGameOver) return;
-    defenseMines.push(new DefenseFirework(x, y));
-}
-
-function createFireworkBurst(x, y, color, count) {
-    for(let i=0; i<count; i++) {
-        particles.push(new Particle(x, y, color, 1.0));
-    }
-}
-
-// Special particle effect for direct hit
-function createDirectHitEffect(x, y) {
-    // Golden starburst pattern
-    const colors = ['#ffcc00', '#ffffff', '#ff9900', '#ffff00'];
-    for(let i=0; i<60; i++) {
-        const color = colors[Math.floor(Math.random() * colors.length)];
-        particles.push(new Particle(x, y, color, 2.5, 3.0));
-    }
-    // Ring of sparks
-    for(let i=0; i<24; i++) {
-        const angle = (i / 24) * Math.PI * 2;
-        const p = new Particle(x, y, '#ffffff', 0.1, 2.0);
-        p.vx = Math.cos(angle) * 8;
-        p.vy = Math.sin(angle) * 8;
-        p.gravity = 0;
-        p.friction = 0.92;
-        p.decay = 0.025;
-        particles.push(p);
-    }
-    // Central flash particles
-    for(let i=0; i<15; i++) {
-        const p = new Particle(x, y, '#ffffff', 0.5, 5.0);
-        p.decay = 0.05;
-        p.gravity = 0;
-        particles.push(p);
-    }
-}
-
-function endGame() {
-    isGameOver = true;
-    finalScoreEl.innerText = score;
-
-    // Check for new high score
-    const isNewHighScore = score > highScore;
-    if (isNewHighScore) {
-        highScore = score;
-        saveHighScore();
-    }
-
-    // Update high score display
-    highscoreEl.innerText = highScore;
-    newHighscoreEl.style.display = isNewHighScore ? 'block' : 'none';
-
-    gameOverEl.style.display = 'block';
-}
-
+/**
+ * Main game loop
+ */
 function gameLoop(timestamp) {
-    const dt = timestamp - lastTime;
-    lastTime = timestamp;
-    ctx.fillStyle = '#050505';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    if (screenShake > 0) {
-        const sx = (Math.random() - 0.5) * screenShake;
-        const sy = (Math.random() - 0.5) * screenShake;
-        ctx.setTransform(1, 0, 0, 1, sx, sy);
-        screenShake *= 0.9;
-        if (screenShake < 0.5) {
-            screenShake = 0;
-        }
+    if (!state) {
+        requestAnimationFrame(gameLoop);
+        return;
     }
 
-    stars.forEach(s => s.draw());
+    const dt = timestamp - state.lastTime;
+    state.lastTime = timestamp;
 
-    if (!isGameOver) {
-        spawnTimer += dt;
-        levelTimer += dt;
-        level = Math.floor(levelTimer / CONFIG.level.timeWeight + score / CONFIG.level.scoreWeight) + 1;
-        if (spawnTimer > spawnInterval) {
-            missiles.push(new EnemyMissile());
-            spawnTimer = 0;
-            spawnInterval = Math.max(CONFIG.spawn.minInterval, CONFIG.spawn.baseInterval - (level * CONFIG.spawn.levelScale));
+    // 1. Buffer -> State (process input)
+    processInput(state);
+
+    // 2. Pure logic (no I/O)
+    if (!state.isGameOver) {
+        updateSpawning(state, dt);
+    }
+    updateMovement(state);
+    updateCollisions(state);
+
+    // Track combo changes for UI pulse
+    if (state.combo !== previousCombo && state.combo > 0) {
+        pulseCombo(domElements.comboContainer);
+    }
+    previousCombo = state.combo;
+
+    // 3. Sound buffer -> Audio
+    flushSounds(state.soundBuffer, audio);
+    state.soundBuffer = [];
+
+    // 4. State -> Screen
+    render(ctx, state, domElements);
+
+    // Save high score if game just ended
+    if (state.isGameOver && state.score > 0) {
+        const currentSavedHighScore = loadHighScore();
+        if (state.highScore > currentSavedHighScore) {
+            saveHighScore(state.highScore);
         }
     }
-
-    cities.forEach(c => c.draw());
-    missiles = missiles.filter(m => m.active);
-    missiles.forEach(m => { m.update(); m.draw(); });
-    defenseMines = defenseMines.filter(dm => dm.active);
-    defenseMines.forEach(dm => { dm.update(); dm.draw(); });
-    explosions = explosions.filter(e => e.active);
-    explosions.forEach(e => { e.update(); e.draw(); });
-    particles = particles.filter(p => p.active);
-    particles.forEach(p => { p.update(); p.draw(); });
-
-    // Always reset transform at end of frame
-    ctx.resetTransform();
-
-    scoreEl.innerText = score;
-    levelEl.innerText = level;
 
     requestAnimationFrame(gameLoop);
 }
 
+// Start the game when the window loads
 window.onload = init;
