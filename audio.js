@@ -2,6 +2,8 @@ export default class AudioManager {
     constructor() {
         this.ctx = null;
         this.masterGain = null;
+        // 1. Add BGM Master Node
+        this.bgmMaster = null; 
         this.enabled = false;
         
         // BGM State
@@ -23,9 +25,17 @@ export default class AudioManager {
     init() {
         if (this.ctx) return;
         this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Global Master Gain
         this.masterGain = this.ctx.createGain();
         this.masterGain.gain.value = 0.3;
         this.masterGain.connect(this.ctx.destination);
+
+        // 2. Initialize BGM Master Gain (Set to 70% volume)
+        this.bgmMaster = this.ctx.createGain();
+        this.bgmMaster.gain.value = 0.2; 
+        this.bgmMaster.connect(this.masterGain);
+
         this.enabled = true;
 
         // Initialize BGM Effects (Space Delay)
@@ -45,8 +55,9 @@ export default class AudioManager {
         delayFilter.connect(feedback);
         feedback.connect(this.bgmDelay);
         
-        // Connect to Master
-        delayFilter.connect(this.masterGain);
+        // 3. Connect Delay output to BGM Master instead of Global Master
+        // delayFilter.connect(this.masterGain); // OLD
+        delayFilter.connect(this.bgmMaster); // NEW
 
         const hint = document.getElementById('audio-hint');
         if (hint) hint.style.display = 'none';
@@ -134,7 +145,10 @@ export default class AudioManager {
         osc.connect(filter);
         filter.connect(gain);
         gain.connect(panner);
-        panner.connect(this.masterGain);
+        
+        // 4. Connect to BGM Master instead of Global Master
+        // panner.connect(this.masterGain); // OLD
+        panner.connect(this.bgmMaster); // NEW
         
         // Send to delay
         const sendGain = this.ctx.createGain();
@@ -146,7 +160,6 @@ export default class AudioManager {
         osc.stop(now + attack + sustain + release + 1);
 
         this.activeNodes.push({ source: osc, gainParam: gain.gain });
-        // Clean up activeNodes array occasionally to prevent memory leak logic could be added here
     }
 
     playStarTwinkle() {
@@ -174,13 +187,18 @@ export default class AudioManager {
 
         osc.connect(gain);
         gain.connect(panner);
-        panner.connect(this.masterGain);
+        
+        // 5. Connect to BGM Master instead of Global Master
+        // panner.connect(this.masterGain); // OLD
+        panner.connect(this.bgmMaster); // NEW
+        
         panner.connect(this.bgmDelay);
 
         osc.start(now);
         osc.stop(now + attack + release + 1);
     }
 
+    // ... (Remaining SE functions playLaunch, playExplosion, playCityHit stay unchanged as they use this.masterGain)
     playLaunch() {
         if (!this.enabled) return;
         const osc = this.ctx.createOscillator();
@@ -195,7 +213,7 @@ export default class AudioManager {
         gain.gain.setValueAtTime(0.18 + Math.random() * 0.04, this.ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
         osc.connect(gain);
-        gain.connect(this.masterGain);
+        gain.connect(this.masterGain); // SE uses master directly
         osc.start();
         osc.stop(this.ctx.currentTime + duration);
     }
@@ -226,7 +244,7 @@ export default class AudioManager {
         filter.Q.setValueAtTime(0.5 + Math.random() * 1.5, this.ctx.currentTime);
         noise.connect(filter);
         filter.connect(noiseGain);
-        noiseGain.connect(this.masterGain);
+        noiseGain.connect(this.masterGain); // SE uses master directly
 
         const thump = this.ctx.createOscillator();
         const thumpGain = this.ctx.createGain();
@@ -240,7 +258,7 @@ export default class AudioManager {
         thumpGain.gain.setValueAtTime(volume * 2 * (0.9 + Math.random() * 0.2), this.ctx.currentTime);
         thumpGain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + thumpDur);
         thump.connect(thumpGain);
-        thumpGain.connect(this.masterGain);
+        thumpGain.connect(this.masterGain); // SE uses master directly
 
         noise.start();
         thump.start();
@@ -263,7 +281,7 @@ export default class AudioManager {
         gain.gain.setValueAtTime(0.27 + Math.random() * 0.06, this.ctx.currentTime);
         gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + duration);
         osc.connect(gain);
-        gain.connect(this.masterGain);
+        gain.connect(this.masterGain); // SE uses master directly
         osc.start();
         osc.stop(this.ctx.currentTime + duration);
     }
