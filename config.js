@@ -51,9 +51,9 @@ export const DEFAULT_CONFIG = {
 
   combo: {
     multiplierPerStack: 0.2,
-    decayRateOnMiss: 0.5,
+    decayRateOnMiss: 0.7,
     decayRateOnGroundHit: 1.0,
-    decayRateOnCityHit: 1.0,
+    decayRateOnCityHit: 0.7,
     directHitBonus: {
       normal: 5,
       fast: 10,
