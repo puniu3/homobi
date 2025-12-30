@@ -110,10 +110,9 @@ function checkExplosionHits(state) {
                 missile.active = false;
 
                 if (explosion.isPlayer) {
-                    if (!explosion.hasHitEnemy) {
-                        explosion.hasHitEnemy = true;
-                        state.combo++;
-                    }
+                    // Each kill contributes to combo
+                    explosion.hasHitEnemy = true;
+                    state.combo++;
                     const basePoints = CONFIG.scoring.explosionHit.base;
                     const multiplier = 1 + (state.combo * CONFIG.combo.multiplierPerStack);
                     state.score += Math.floor(
