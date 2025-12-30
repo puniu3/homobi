@@ -659,7 +659,7 @@
                     if (this.radius <= 0 || this.alpha <= 0) {
                         this.active = false;
                         if (this.isPlayer && !this.hasHitEnemy) {
-                            resetCombo();
+                            decreaseCombo();
                         }
                     }
                 }
@@ -750,6 +750,11 @@
         function resetCombo() {
             combo = 0;
             updateComboUI(false);
+        }
+        
+        function decreaseCombo() {
+            combo = Math.floor(combo * .5);
+            updateComboUI(true);
         }
 
         function updateComboUI(active) {
