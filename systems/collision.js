@@ -99,15 +99,6 @@ function checkExplosionHits(state) {
     for (const explosion of state.explosions) {
         if (!explosion.active) continue;
 
-        // Check if explosion just became inactive (shrunk to 0)
-        if (explosion.radius <= 0 || explosion.alpha <= 0) {
-            if (explosion.isPlayer && !explosion.hasHitEnemy) {
-                // Decrease combo on miss
-                state.combo = Math.floor(state.combo * CONFIG.combo.decayRate);
-            }
-            continue;
-        }
-
         for (const missile of state.missiles) {
             if (!missile.active) continue;
 

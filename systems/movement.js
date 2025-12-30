@@ -3,6 +3,7 @@
  * Updates positions of all moving entities
  */
 
+import { CONFIG } from '../config.js';
 import { createParticle } from '../state.js';
 
 /**
@@ -77,6 +78,10 @@ function updateExplosions(state) {
             explosion.alpha -= 0.01;
             if (explosion.radius <= 0 || explosion.alpha <= 0) {
                 explosion.active = false;
+                // Decay combo if player explosion didn't hit any enemy
+                if (explosion.isPlayer && !explosion.hasHitEnemy) {
+                    state.combo = Math.floor(state.combo * CONFIG.combo.decayRate);
+                }
             }
         }
     }
