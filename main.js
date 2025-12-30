@@ -5,6 +5,7 @@
 
 import AudioManager from './audio.js';
 import { CONFIG } from './config.js';
+import { initConfigUI } from './config-ui.js';
 import {
     createInitialState,
     createStar,
@@ -87,6 +88,9 @@ function resize() {
 function init() {
     resize();
     window.addEventListener('resize', resize);
+
+    // Initialize config UI
+    initConfigUI();
 
     // Input event handlers - buffer input, don't process directly
     const triggerInput = (e) => {

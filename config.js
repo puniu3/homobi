@@ -3,7 +3,12 @@
  * All gameplay-affecting values in one place for tuning
  */
 
-export const CONFIG = {
+const STORAGE_KEY = 'celestialGuardian_config';
+
+/**
+ * Default configuration values (immutable reference for reset)
+ */
+export const DEFAULT_CONFIG = {
   spawn: {
     baseInterval: 2000,
     minInterval: 500,
@@ -67,3 +72,72 @@ export const CONFIG = {
     missThreshold: 6, // misses before fast missile spawns
   },
 };
+
+/**
+ * Deep clone an object
+ */
+function deepClone(obj) {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+/**
+ * Deep merge source into target
+ */
+function deepMerge(target, source) {
+  for (const key in source) {
+    if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+      if (!target[key] || typeof target[key] !== 'object') {
+        target[key] = {};
+      }
+      deepMerge(target[key], source[key]);
+    } else {
+      target[key] = source[key];
+    }
+  }
+  return target;
+}
+
+/**
+ * Load saved config from LocalStorage
+ */
+function loadSavedConfig() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.warn('Could not load saved config:', e);
+  }
+  return null;
+}
+
+/**
+ * Active configuration (starts with defaults, merged with saved values)
+ */
+export const CONFIG = deepClone(DEFAULT_CONFIG);
+
+// Initialize CONFIG from LocalStorage on load
+const savedConfig = loadSavedConfig();
+if (savedConfig) {
+  deepMerge(CONFIG, savedConfig);
+}
+
+/**
+ * Save current CONFIG to LocalStorage
+ */
+export function saveConfig(configObj) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(configObj));
+    deepMerge(CONFIG, configObj);
+  } catch (e) {
+    console.warn('Could not save config:', e);
+  }
+}
+
+/**
+ * Get storage key (for external use)
+ */
+export function getStorageKey() {
+  return STORAGE_KEY;
+}
