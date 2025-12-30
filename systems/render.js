@@ -5,13 +5,30 @@
 
 import { CONFIG } from '../config.js';
 
+// Pre-computed constants for performance
+const TWO_PI = Math.PI * 2;
+
+// DOM update cache to avoid unnecessary updates
+let lastScore = -1;
+let lastLevel = -1;
+let lastCombo = -1;
+
+/**
+ * Reset render cache (call on game restart)
+ */
+export function resetRenderCache() {
+    lastScore = -1;
+    lastLevel = -1;
+    lastCombo = -1;
+}
+
 /**
  * Draw a star
  */
 function drawStar(ctx, star) {
     ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0, star.alpha)})`;
     ctx.beginPath();
-    ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+    ctx.arc(star.x, star.y, star.size, 0, TWO_PI);
     ctx.fill();
 }
 
@@ -53,17 +70,17 @@ function drawMissile(ctx, missile) {
         grad.addColorStop(1, 'rgba(255, 0, 255, 0)');
         ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.arc(missile.x, missile.y, glowSize, 0, Math.PI * 2);
+        ctx.arc(missile.x, missile.y, glowSize, 0, TWO_PI);
         ctx.fill();
 
         // Inner bright core
         ctx.fillStyle = '#ff88ff';
         ctx.beginPath();
-        ctx.arc(missile.x, missile.y, 6, 0, Math.PI * 2);
+        ctx.arc(missile.x, missile.y, 6, 0, TWO_PI);
         ctx.fill();
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.arc(missile.x, missile.y, 3, 0, Math.PI * 2);
+        ctx.arc(missile.x, missile.y, 3, 0, TWO_PI);
         ctx.fill();
     } else {
         // Normal missile: orange glow
@@ -76,15 +93,15 @@ function drawMissile(ctx, missile) {
         grad.addColorStop(1, 'rgba(255, 68, 0, 0)');
         ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.arc(missile.x, missile.y, glowSize, 0, Math.PI * 2);
+        ctx.arc(missile.x, missile.y, glowSize, 0, TWO_PI);
         ctx.fill();
         ctx.fillStyle = '#ff9900';
         ctx.beginPath();
-        ctx.arc(missile.x, missile.y, 4, 0, Math.PI * 2);
+        ctx.arc(missile.x, missile.y, 4, 0, TWO_PI);
         ctx.fill();
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.arc(missile.x, missile.y, 2, 0, Math.PI * 2);
+        ctx.arc(missile.x, missile.y, 2, 0, TWO_PI);
         ctx.fill();
     }
 
@@ -97,28 +114,29 @@ function drawMissile(ctx, missile) {
 function drawDefenseMine(ctx, mine) {
     ctx.fillStyle = '#fff';
     ctx.beginPath();
-    ctx.arc(mine.x, mine.y, 3, 0, Math.PI * 2);
+    ctx.arc(mine.x, mine.y, 3, 0, TWO_PI);
     ctx.fill();
 }
 
 /**
  * Draw an explosion
+ * Note: globalAlpha reset is handled in render() after all alpha-based drawing
  */
 function drawExplosion(ctx, explosion) {
     // Prevent drawing with invalid radius (negative radius causes DOMException)
     if (explosion.radius <= 0 || explosion.alpha <= 0) return;
 
     ctx.beginPath();
-    ctx.arc(explosion.x, explosion.y, explosion.radius, 0, Math.PI * 2);
+    ctx.arc(explosion.x, explosion.y, explosion.radius, 0, TWO_PI);
     ctx.strokeStyle = explosion.color;
     ctx.globalAlpha = explosion.alpha;
     ctx.lineWidth = 2;
     ctx.stroke();
-    ctx.globalAlpha = 1.0;
 }
 
 /**
  * Draw a particle
+ * Uses fillRect for small particles (size <= 2) for better performance
  */
 function drawParticle(ctx, particle) {
     // Prevent drawing with invalid alpha
@@ -126,22 +144,32 @@ function drawParticle(ctx, particle) {
 
     ctx.globalAlpha = particle.alpha;
     ctx.fillStyle = Math.random() > 0.9 ? '#fff' : particle.color;
-    ctx.beginPath();
-    ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1.0;
+
+    if (particle.size <= 2) {
+        // Small particles: use faster fillRect
+        const size = particle.size * 2;
+        ctx.fillRect(particle.x - particle.size, particle.y - particle.size, size, size);
+    } else {
+        // Larger particles: use arc for smooth circles
+        ctx.beginPath();
+        ctx.arc(particle.x, particle.y, particle.size, 0, TWO_PI);
+        ctx.fill();
+    }
 }
 
 /**
- * Update combo UI display
+ * Update combo UI display (only when changed)
  */
 function updateComboUI(state, comboContainer, comboValEl, multValEl) {
-    if (state.combo > 0) {
-        comboContainer.classList.remove('combo-hidden');
-        comboValEl.innerText = state.combo;
-        multValEl.innerText = (1 + state.combo * CONFIG.combo.multiplierPerStack).toFixed(1);
-    } else {
-        comboContainer.classList.add('combo-hidden');
+    if (state.combo !== lastCombo) {
+        lastCombo = state.combo;
+        if (state.combo > 0) {
+            comboContainer.classList.remove('combo-hidden');
+            comboValEl.innerText = state.combo;
+            multValEl.innerText = (1 + state.combo * CONFIG.combo.multiplierPerStack).toFixed(1);
+        } else {
+            comboContainer.classList.add('combo-hidden');
+        }
     }
 }
 
@@ -207,12 +235,21 @@ export function render(ctx, state, domElements) {
         }
     }
 
+    // Reset globalAlpha after all alpha-based drawing (explosions & particles)
+    ctx.globalAlpha = 1.0;
+
     // Reset transform
     ctx.resetTransform();
 
-    // Update DOM
-    scoreEl.innerText = state.score;
-    levelEl.innerText = state.level;
+    // Update DOM (only when values change)
+    if (state.score !== lastScore) {
+        lastScore = state.score;
+        scoreEl.innerText = state.score;
+    }
+    if (state.level !== lastLevel) {
+        lastLevel = state.level;
+        levelEl.innerText = state.level;
+    }
     updateComboUI(state, comboContainer, comboValEl, multValEl);
 
     // Handle game over display
