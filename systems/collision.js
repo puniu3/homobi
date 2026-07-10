@@ -72,20 +72,21 @@ function checkDefenseDirectHits(state) {
                 createExplosion(mine.x, mine.y, mine.color, CONFIG.defense.explosionRadius * scale, true)
             );
             createFireworkBurst(state.particles, mine.x, mine.y, mine.color, 120, scale);
-            // Add white sparkle particles
+            // Add white sparkle particles (one-shot burst per arrival; counts
+            // stay, but per-step physics constants are re-scaled for 120Hz)
             for (let i = 0; i < 5; i++) {
                 state.particles.push({
                     x: mine.x,
                     y: mine.y,
                     color: '#ffffff',
-                    vx: (Math.random() - 0.5) * 16 * scale,
-                    vy: (Math.random() - 0.5) * 16 * scale,
+                    vx: (Math.random() - 0.5) * 8 * scale,   // @120Hz: half of old 16
+                    vy: (Math.random() - 0.5) * 8 * scale,   // @120Hz: half of old 16
                     alpha: 1,
-                    friction: 0.95,
-                    gravity: 0.08 * scale,
+                    friction: Math.sqrt(0.95),               // multiplicative -> sqrt
+                    gravity: 0.04 * scale,                   // per-step incr -> half of 0.08
                     size: 2.5 + Math.random(),
                     active: true,
-                    decay: 0.01 + Math.random() * 0.02,
+                    decay: 0.005 + Math.random() * 0.01,     // linear -> half of old
                 });
             }
         }

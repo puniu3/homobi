@@ -189,15 +189,11 @@ export function render(ctx, state, domElements) {
     ctx.fillStyle = '#050505';
     ctx.fillRect(0, 0, state.canvasWidth, state.canvasHeight);
 
-    // Apply screen shake
+    // Apply screen shake (decay happens in the sim step; render only reads it)
     if (state.screenShake > 0) {
         const sx = (Math.random() - 0.5) * state.screenShake;
         const sy = (Math.random() - 0.5) * state.screenShake;
         ctx.setTransform(1, 0, 0, 1, sx, sy);
-        state.screenShake *= 0.9;
-        if (state.screenShake < 0.5) {
-            state.screenShake = 0;
-        }
     }
 
     const { scale } = state;
