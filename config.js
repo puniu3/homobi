@@ -30,14 +30,14 @@ export const DEFAULT_CONFIG = {
 
   missile: {
     normal: {
-      baseSpeed: 1,
-      levelBonus: 0.15,
+      baseSpeed: 0.5,       // per-step @120Hz (half of old 60fps value 1)
+      levelBonus: 0.075,    // per-step @120Hz (half of old 0.15)
       explosionRadius: 40,
       screenShake: 15,
     },
     fast: {
-      baseSpeed: 18,
-      speedVariance: 8,
+      baseSpeed: 9,         // per-step @120Hz (half of old 18)
+      speedVariance: 4,     // per-step @120Hz (half of old 8)
       explosionRadius: 80,
       screenShake: 30,
     },
@@ -45,7 +45,7 @@ export const DEFAULT_CONFIG = {
   },
 
   defense: {
-    speed: 11,
+    speed: 5.5,            // per-step @120Hz (half of old 11)
     explosionRadius: 75,
     arrivalDistance: 12, // distance to target to trigger explosion
   },

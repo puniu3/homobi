@@ -149,6 +149,16 @@ function restartGame() {
 window.restartGame = restartGame;
 
 /**
+ * Fixed-timestep simulation constants.
+ * The sim runs at a fixed 120Hz internal rate so gameplay is frame-rate
+ * independent (identical speed on 60Hz and 120Hz+ displays). All per-step
+ * displacement/rate constants are tuned for STEP; see config.js / state.js.
+ */
+const STEP = 1000 / 120;        // ms per sim step (~8.333)
+const MAX_FRAME_DT = 250;       // clamp huge frames (tab-switch) to avoid spiral
+const MAX_STEPS = 10;           // max sim steps per frame (spiral-of-death guard)
+
+/**
  * Main game loop
  */
 function gameLoop(timestamp) {
@@ -160,15 +170,26 @@ function gameLoop(timestamp) {
     const dt = timestamp - state.lastTime;
     state.lastTime = timestamp;
 
-    // 1. Buffer -> State (process input)
+    // 1. Buffer -> State (process input) — ONCE per frame (buffered launches;
+    //    per-substep would multi-fire a single tap)
     processInput(state);
 
-    // 2. Pure logic (no I/O)
-    if (!state.isGameOver) {
-        updateSpawning(state, dt);
+    // 2. Fixed-timestep simulation (pure logic, no I/O)
+    state.accumulator += Math.min(dt, MAX_FRAME_DT);
+    let steps = 0;
+    while (state.accumulator >= STEP && steps < MAX_STEPS) {
+        if (!state.isGameOver) {
+            updateSpawning(state, STEP);
+        }
+        updateMovement(state);
+        updateCollisions(state);
+        state.accumulator -= STEP;
+        steps++;
     }
-    updateMovement(state);
-    updateCollisions(state);
+    if (steps >= MAX_STEPS) {
+        // Fell behind (long stall); drop the backlog rather than spiral.
+        state.accumulator = 0;
+    }
 
     // Track combo changes for UI pulse
     if (state.combo !== previousCombo && state.combo > 0) {

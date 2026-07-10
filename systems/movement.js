@@ -33,15 +33,18 @@ function updateMissiles(state) {
         missile.y += missile.vy;
 
         if (missile.isFast) {
-            missile.flicker += 0.8;
-            // Intense particle trail
-            for (let i = 0; i < 3; i++) {
-                state.particles.push(createParticle(missile.x, missile.y, '#ff00ff', 1.0, 1.8, {}, scale));
+            missile.flicker += 0.4;   // @120Hz: half osc speed (half of old 0.8)
+            // Intense particle trail — emit at half rate per step to keep @60fps density
+            if (Math.random() < 0.5) {
+                for (let i = 0; i < 3; i++) {
+                    state.particles.push(createParticle(missile.x, missile.y, '#ff00ff', 1.0, 1.8, {}, scale));
+                }
+                state.particles.push(createParticle(missile.x, missile.y, '#ffffff', 0.6, 1.2, {}, scale));
             }
-            state.particles.push(createParticle(missile.x, missile.y, '#ffffff', 0.6, 1.2, {}, scale));
         } else {
-            missile.flicker += 0.2;
-            if (Math.random() > 0.3) {
+            missile.flicker += 0.1;   // @120Hz: half osc speed (half of old 0.2)
+            // half emission rate: old p=0.7 per frame -> p=0.35 per step
+            if (Math.random() > 0.65) {
                 state.particles.push(createParticle(missile.x, missile.y, '#ff4400', 0.6, 1.2, {}, scale));
             }
         }
@@ -60,7 +63,10 @@ function updateDefenseMines(state) {
 
         mine.x += mine.vx;
         mine.y += mine.vy;
-        state.particles.push(createParticle(mine.x, mine.y, mine.color, 0.3, 1.0, {}, scale));
+        // half emission rate per step to keep @60fps trail density
+        if (Math.random() < 0.5) {
+            state.particles.push(createParticle(mine.x, mine.y, mine.color, 0.3, 1.0, {}, scale));
+        }
     }
 }
 
@@ -70,8 +76,8 @@ function updateDefenseMines(state) {
  */
 function updateExplosions(state) {
     const { scale } = state;
-    const growSpeed = 5 * scale;
-    const shrinkSpeed = 1.8 * scale;
+    const growSpeed = 2.5 * scale;    // @120Hz: half of old 5
+    const shrinkSpeed = 0.9 * scale;  // @120Hz: half of old 1.8
 
     for (const explosion of state.explosions) {
         if (!explosion.active) continue;
@@ -83,7 +89,7 @@ function updateExplosions(state) {
             }
         } else {
             explosion.radius -= shrinkSpeed;
-            explosion.alpha -= 0.01;
+            explosion.alpha -= 0.005;   // @120Hz: half of old 0.01 per-step decay
             if (explosion.radius <= 0 || explosion.alpha <= 0) {
                 explosion.active = false;
                 // Decay combo if player explosion didn't hit any enemy
@@ -117,6 +123,21 @@ function updateParticles(state) {
 }
 
 /**
+ * Decay screen shake. Runs in the sim step (not render) so it is
+ * frame-rate independent. Multiplicative decay -> sqrt transform @120Hz.
+ * render.js only READS state.screenShake.
+ * @param {Object} state - Game state
+ */
+function updateScreenShake(state) {
+    if (state.screenShake > 0) {
+        state.screenShake *= Math.sqrt(0.9);
+        if (state.screenShake < 0.5) {
+            state.screenShake = 0;
+        }
+    }
+}
+
+/**
  * Update all entity movements
  * @param {Object} state - Game state
  */
@@ -126,4 +147,5 @@ export function updateMovement(state) {
     updateDefenseMines(state);
     updateExplosions(state);
     updateParticles(state);
+    updateScreenShake(state);
 }

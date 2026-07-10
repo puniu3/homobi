@@ -29,6 +29,7 @@ export function createInitialState(canvasWidth, canvasHeight) {
         spawnInterval: CONFIG.spawn.baseInterval,
         levelTimer: 0,
         lastTime: 0,
+        accumulator: 0,   // fixed-timestep accumulator (ms) for the 120Hz sim loop
 
         // Canvas dimensions (for spawning/positioning)
         canvasWidth,
@@ -57,7 +58,7 @@ export function createStar(canvasWidth, canvasHeight) {
         x: Math.random() * canvasWidth,
         y: Math.random() * (canvasHeight * 0.7),
         size: Math.random() * 1.5,
-        blinkSpeed: 0.01 + Math.random() * 0.05,
+        blinkSpeed: 0.005 + Math.random() * 0.025,   // per-step @120Hz (half of old)
         alpha: Math.random(),
     };
 }
@@ -69,7 +70,7 @@ export function resetStar(star, canvasWidth, canvasHeight) {
     star.x = Math.random() * canvasWidth;
     star.y = Math.random() * (canvasHeight * 0.7);
     star.size = Math.random() * 1.5;
-    star.blinkSpeed = 0.01 + Math.random() * 0.05;
+    star.blinkSpeed = 0.005 + Math.random() * 0.025;   // per-step @120Hz (half of old)
     star.alpha = Math.random();
 }
 
@@ -204,7 +205,8 @@ export function createExplosion(x, y, color, maxRadius, isPlayer) {
  */
 export function createParticle(x, y, color, speedScale = 1, size = 1.5, overrides = {}, scale = 1) {
     const angle = Math.random() * Math.PI * 2;
-    const speed = (Math.random() * 5 + 2) * speedScale * scale;
+    // @120Hz: per-step displacement velocity halved (2x steps -> same total travel)
+    const speed = (Math.random() * 2.5 + 1) * speedScale * scale;
 
     return {
         x,
@@ -213,11 +215,14 @@ export function createParticle(x, y, color, speedScale = 1, size = 1.5, override
         vx: overrides.vx !== undefined ? overrides.vx * scale : Math.cos(angle) * speed,
         vy: overrides.vy !== undefined ? overrides.vy * scale : Math.sin(angle) * speed,
         alpha: 1,
-        friction: overrides.friction !== undefined ? overrides.friction : 0.95,
-        gravity: overrides.gravity !== undefined ? overrides.gravity * scale : 0.08 * scale,
+        // multiplicative decay: sqrt transform preserves v*f^steps when steps double
+        friction: overrides.friction !== undefined ? overrides.friction : Math.sqrt(0.95),
+        // per-step velocity increment -> halved
+        gravity: overrides.gravity !== undefined ? overrides.gravity * scale : 0.04 * scale,
         size: size + Math.random(),  // size is scaled at render time
         active: true,
-        decay: overrides.decay !== undefined ? overrides.decay : 0.01 + Math.random() * 0.02,
+        // linear alpha decay per step -> halved to preserve real-time lifetime
+        decay: overrides.decay !== undefined ? overrides.decay : 0.005 + Math.random() * 0.01,
     };
 }
 
@@ -244,17 +249,17 @@ export function createDirectHitEffect(particles, x, y, scale = 1) {
     for (let i = 0; i < 24; i++) {
         const angle = (i / 24) * Math.PI * 2;
         particles.push(createParticle(x, y, '#ffffff', 0.1, 2.0, {
-            vx: Math.cos(angle) * 8,
-            vy: Math.sin(angle) * 8,
+            vx: Math.cos(angle) * 4,          // @120Hz: half of old 8
+            vy: Math.sin(angle) * 4,          // @120Hz: half of old 8
             gravity: 0,
-            friction: 0.92,
-            decay: 0.025,
+            friction: Math.sqrt(0.92),        // multiplicative decay -> sqrt transform
+            decay: 0.0125,                    // linear decay -> half of old 0.025
         }, scale));
     }
     // Central flash particles
     for (let i = 0; i < 15; i++) {
         particles.push(createParticle(x, y, '#ffffff', 0.5, 5.0, {
-            decay: 0.05,
+            decay: 0.025,                     // linear decay -> half of old 0.05
             gravity: 0,
         }, scale));
     }
